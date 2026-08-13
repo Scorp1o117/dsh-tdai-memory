@@ -1,0 +1,53 @@
+﻿{
+  "name": "dsh-tdai-memory",
+  "version": "0.1.0",
+  "description": "TencentDB Agent Memory for DeepSeek Harness: L0 conversation capture, L1 structured memory extraction, L2 scenes / L3 persona, automatic recall injection, and memory search tools. Uses the existing ~/.memory-tencentdb/memory-tdai data directory.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "recall-inject.js",
+    "vendor",
+    "README.md",
+    "README.zh.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "tencentdb",
+    "agent-memory",
+    "rag",
+    "vector-search",
+    "persona"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Scorp1o117/dsh-tdai-memory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Scorp1o117/dsh-tdai-memory/issues"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.53",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1",
+    "@node-rs/jieba": "^2.0.1",
+    "@tencentdb-agent-memory/tcvdb-text": "^0.1.1",
+    "ai": "^6.0.164",
+    "json5": "^2.2.3",
+    "sqlite-vec": "0.1.7-alpha.2",
+    "undici": "^8.1.0"
+  }
+}
+
