@@ -27,22 +27,32 @@
 - **headless 一次性任务**：flush 内再等 `core.handleSessionEnd()`（L1 提取跑完才退出；否则 5s 关闭超时会杀掉提取）
 - **召回注入**：必须注册在 **`agent.ctx`** 上（组装在 agent 作用域进行，root 监听器收不到）；`session/created` 后延迟一 tick 从 `agents` 服务拿 agent
 
-## 配置（profile patch）
+## 配置（profile patch + settings）
+
+配置以 **settings 命名空间**驱动：profile patch 作为 base 层，`$DSH_HOME/settings.yaml` 的 `tdai-memory:` 节覆盖（LLM/embedding 密钥已迁到 settings.yaml）。Web UI 设置 → 记忆 可编辑全部字段（v0.2.0，含写-only 密钥）；TdaiCore 启动时构建，改动**重启后生效**。
 
 ```yaml
+# $DSH_HOME/settings.yaml
+tdai-memory:
+  llm:
+    apiKey: 'sk-...'
+  embedding:
+    apiKey: 'local-no-key'
+```
+
+```yaml
+# profile patch（base 层）
 - id: tdai-memory
-  name: './plugins/dsh-tdai-memory/index.js'
+  name: 'dsh-tdai-memory'
   config:
     extraction:
       enabled: true
       enableDedup: false      # dedup 的 LLM 输出解析不稳，先关
     llm:                      # L1/L2/L3 提取模型（OpenAI 兼容）
       baseUrl: 'https://opencode.ai/zen/go/v1'
-      apiKey: 'sk-...'
       model: 'mimo-v2.5'      # deepseek-v4-flash 对提取 JSON 输出不合格
     embedding:                # 向量（OpenAI 兼容 /v1/embeddings）
       baseUrl: 'http://127.0.0.1:8088/v1'
-      apiKey: 'local-no-key'  # parseConfig 强制 apiKey 非空，本地端点可占位
       model: 'Qwen3-Embedding-0.6B'
       dimensions: 1024
       sendDimensions: false

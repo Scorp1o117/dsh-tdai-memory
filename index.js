@@ -21,6 +21,7 @@ import os from "node:os";
 import { join } from "node:path";
 import z from "@deepseek-ai/schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
+import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import { TdaiCore } from "./vendor/tdai/core/tdai-core.js";
 import { parseConfig } from "./vendor/tdai/config.js";
 import { StandaloneHostAdapter } from "./vendor/tdai/adapters/standalone/host-adapter.js";
@@ -29,6 +30,8 @@ import { StandaloneHostAdapter } from "./vendor/tdai/adapters/standalone/host-ad
 const name = "tdai-memory";
 /** Services this row injects. */
 const inject = ["sessions", "systemPrompt", "tools"];
+/** Settings namespace owned by this plugin (Web UI settings section). */
+const NS = settingsNamespace("tdai-memory");
 
 /** Runtime schema for the tdai-memory row. */
 const Config = z.object({
@@ -37,7 +40,7 @@ const Config = z.object({
   /** LLM used for L1/L2/L3 extraction (OpenAI-compatible). Falls back to TDAI_LLM_* env. */
   llm: z.object({
     baseUrl: z.string().default(""),
-    apiKey: z.string().default(""),
+    apiKey: z.string().default("").role("secret"),
     model: z.string().default(""),
     maxTokens: z.number().default(4096),
     timeoutMs: z.number().default(120000),
@@ -45,7 +48,7 @@ const Config = z.object({
   /** Embedding endpoint (OpenAI-compatible /v1/embeddings). */
   embedding: z.object({
     baseUrl: z.string().default("http://127.0.0.1:8088/v1"),
-    apiKey: z.string().default(""),
+    apiKey: z.string().default("").role("secret"),
     model: z.string().default("Qwen3-Embedding-0.6B"),
     dimensions: z.number().default(1024),
     sendDimensions: z.boolean().default(false),
@@ -81,31 +84,41 @@ function extractText(content) {
 }
 
 function apply(ctx, config) {
-  const dataDir = config.dataDir || join(os.homedir(), ".memory-tencentdb", "memory-tdai");
+  // ── settings-backed configuration ─────────────────────────────────────────
+  // TdaiCore is built once from the RESOLVED settings value (composition
+  // entry as base, `tdai-memory` settings section / settings.yaml as user
+  // layer), so keys stored in settings.yaml are honored. Changes apply after
+  // a restart; the Web UI notes this. If no settings service ever mounts,
+  // the composition entry builds the core unchanged.
+  let started = false;
+  const build = (cfg) => {
+    if (started) return;
+    started = true;
+    const dataDir = cfg.dataDir || join(os.homedir(), ".memory-tencentdb", "memory-tdai");
 
   const tdaiConfig = parseConfig({
     timezone: "system",
     storeBackend: "sqlite",
-    capture: { enabled: config.captureEnabled },
-    extraction: { enabled: config.extraction.enabled, enableDedup: config.extraction.enableDedup },
-    recall: { ...config.recall },
+    capture: { enabled: cfg.captureEnabled },
+    extraction: { enabled: cfg.extraction.enabled, enableDedup: cfg.extraction.enableDedup },
+    recall: { ...cfg.recall },
     embedding: {
       enabled: true,
       provider: "openai",
-      baseUrl: config.embedding.baseUrl,
-      apiKey: config.embedding.apiKey,
-      model: config.embedding.model,
-      dimensions: config.embedding.dimensions,
-      sendDimensions: config.embedding.sendDimensions,
+      baseUrl: cfg.embedding.baseUrl,
+      apiKey: cfg.embedding.apiKey,
+      model: cfg.embedding.model,
+      dimensions: cfg.embedding.dimensions,
+      sendDimensions: cfg.embedding.sendDimensions,
       timeoutMs: 10000,
     },
     llm: {
       enabled: true,
-      baseUrl: config.llm.baseUrl || process.env.TDAI_LLM_BASE_URL || "",
-      apiKey: config.llm.apiKey || process.env.TDAI_LLM_API_KEY || "",
-      model: config.llm.model || process.env.TDAI_LLM_MODEL || "deepseek-v4-flash",
-      maxTokens: config.llm.maxTokens,
-      timeoutMs: config.llm.timeoutMs,
+      baseUrl: cfg.llm.baseUrl || process.env.TDAI_LLM_BASE_URL || "",
+      apiKey: cfg.llm.apiKey || process.env.TDAI_LLM_API_KEY || "",
+      model: cfg.llm.model || process.env.TDAI_LLM_MODEL || "deepseek-v4-flash",
+      maxTokens: cfg.llm.maxTokens,
+      timeoutMs: cfg.llm.timeoutMs,
     },
   });
 
@@ -304,6 +317,20 @@ function apply(ctx, config) {
     }));
   }
 
+  // ── settings-backed configuration ─────────────────────────────────────────
+  // The composition entry stays the base layer; a registered `tdai-memory`
+  // settings section overlays it (settings.yaml). TdaiCore is built once at
+  // startup, so changes apply after a restart — the namespace registration is
+  // what lets the Web UI surface and store them.
+  installSettingsSection(ctx, NS, Config, config, {
+    setSource: (source) => {
+      build(source);
+    },
+    onChange: () => {
+      if (started) ctx.logger.warn("[tdai-memory] settings updated; restart to apply (TdaiCore is built at startup)");
+    },
+  });
+
   // ── lifecycle ────────────────────────────────────────────────────────────
   ctx.effect(async () => {
     await core.initialize();
@@ -323,6 +350,12 @@ function apply(ctx, config) {
       });
     };
   }, "tdai-memory.initialize()");
+  }; // end build(cfg)
+
+  // Fallback when no settings service ever mounts: build from the entry config.
+  setTimeout(() => {
+    if (!started) build(config);
+  }, 0);
 }
 
 export { Config, apply, inject, name };
