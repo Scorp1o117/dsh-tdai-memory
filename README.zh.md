@@ -1,6 +1,6 @@
 # dsh-tdai-memory
 
-**GitHub**: [Scorp1o117/dsh-tdai-memory](https://github.com/Scorp1o117/dsh-tdai-memory) · **npm**: [dsh-tdai-memory](https://www.npmjs.com/package/dsh-tdai-memory)
+**GitHub**: [Scorp1o117/dsh-tdai-memory](https://github.com/Scorp1o117/dsh-tdai-memory) · **npm**: [dsh-tdai-memory](https://www.npmjs.com/package/dsh-tdai-memory) · [English](README.md)
 
 把 **TencentDB Agent Memory**（腾讯云开源的四层记忆系统，原为 OpenClaw 插件）移植进 DeepSeek Harness。
 
