@@ -25,6 +25,7 @@ import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-sett
 import { TdaiCore } from "./vendor/tdai/core/tdai-core.js";
 import { parseConfig } from "./vendor/tdai/config.js";
 import { StandaloneHostAdapter } from "./vendor/tdai/adapters/standalone/host-adapter.js";
+import { ensureSettingsNamespaceExposed } from "./vendor/dsh-settings-expose.js";
 
 /** Cordis plugin name. */
 const name = "tdai-memory";
@@ -358,6 +359,12 @@ function apply(ctx, config) {
       ctx.logger.warn("[tdai-memory] settings updated; restart to apply (TdaiCore is built at startup)");
     },
   });
+
+  // dsh-host-apiproxy hard-codes which settings namespaces the Web client may
+  // see; without this, the settings section answers `settings-not-exposed`
+  // on any stock install. Patch the allowlist idempotently (self-heals after
+  // dsh updates overwrite the file).
+  ensureSettingsNamespaceExposed(ctx, "tdai-memory", ctx.logger);
 
   // Fallback when no settings service ever mounts: build from the entry
   // config. One-shot — if the settings mount arrives later, its build
