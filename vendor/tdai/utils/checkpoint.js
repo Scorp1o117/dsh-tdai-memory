@@ -338,8 +338,12 @@ export class CheckpointManager {
             const state = this.getRunnerState(cp, sessionKey);
             let afterTimestamp = state.last_captured_timestamp || 0;
             // Cold-start guard (same logic that was previously in auto-capture.ts)
+            // Subtract 1ms from the plugin-start floor: the very first turn may be
+            // flushed in the same millisecond the plugin started, and the L0 filter
+            // is strict `timestamp > cursor` — an identical timestamp would drop
+            // the first turn entirely.
             if (afterTimestamp === 0 && pluginStartTimestamp && pluginStartTimestamp > 0) {
-                afterTimestamp = pluginStartTimestamp;
+                afterTimestamp = pluginStartTimestamp - 1;
             }
             const result = await fn(afterTimestamp);
             if (result) {

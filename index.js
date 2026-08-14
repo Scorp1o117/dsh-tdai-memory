@@ -84,74 +84,21 @@ function extractText(content) {
 }
 
 function apply(ctx, config) {
-  // ── settings-backed configuration ─────────────────────────────────────────
-  // TdaiCore is built once from the RESOLVED settings value (composition
-  // entry as base, `tdai-memory` settings section / settings.yaml as user
-  // layer), so keys stored in settings.yaml are honored. Changes apply after
-  // a restart; the Web UI notes this. If no settings service ever mounts,
-  // the composition entry builds the core unchanged.
-  let started = false;
-  const build = (cfg) => {
-    if (started) return;
-    started = true;
-    const dataDir = cfg.dataDir || join(os.homedir(), ".memory-tencentdb", "memory-tdai");
-
-  const tdaiConfig = parseConfig({
-    timezone: "system",
-    storeBackend: "sqlite",
-    capture: { enabled: cfg.captureEnabled },
-    extraction: { enabled: cfg.extraction.enabled, enableDedup: cfg.extraction.enableDedup },
-    recall: { ...cfg.recall },
-    embedding: {
-      enabled: true,
-      provider: "openai",
-      baseUrl: cfg.embedding.baseUrl,
-      apiKey: cfg.embedding.apiKey,
-      model: cfg.embedding.model,
-      dimensions: cfg.embedding.dimensions,
-      sendDimensions: cfg.embedding.sendDimensions,
-      timeoutMs: 10000,
-    },
-    llm: {
-      enabled: true,
-      baseUrl: cfg.llm.baseUrl || process.env.TDAI_LLM_BASE_URL || "",
-      apiKey: cfg.llm.apiKey || process.env.TDAI_LLM_API_KEY || "",
-      model: cfg.llm.model || process.env.TDAI_LLM_MODEL || "deepseek-v4-flash",
-      maxTokens: cfg.llm.maxTokens,
-      timeoutMs: cfg.llm.timeoutMs,
-    },
-  });
-
-  // Verbose tdai-internal logging goes to the console only when explicitly
-  // enabled; routine diagnostics use the dsh logger.
-  const verbose = !!process.env.DSH_TDAI_DEBUG;
-  const log = (level, m) => {
-    if (verbose) console.error(`[tdai-memory] ${m}`);
-    else if (level === "warn") ctx.logger.warn(`[tdai-memory] ${m}`);
-    else if (level === "error") ctx.logger.error(`[tdai-memory] ${m}`);
-  };
-  const logger = {
-    debug: (m) => log("debug", m),
-    info: (m) => log("info", m),
-    warn: (m) => log("warn", m),
-    error: (m) => log("error", m),
-  };
-
-  const hostAdapter = new StandaloneHostAdapter({
-    dataDir,
-    llmConfig: {
-      baseUrl: tdaiConfig.llm.baseUrl,
-      apiKey: tdaiConfig.llm.apiKey,
-      model: tdaiConfig.llm.model,
-      maxTokens: tdaiConfig.llm.maxTokens,
-      timeoutMs: tdaiConfig.llm.timeoutMs,
-    },
-    logger,
-    defaultUserId: "dsh-user",
-    platform: "dsh",
-  });
-
-  const core = new TdaiCore({ hostAdapter, config: tdaiConfig, instanceId: "dsh" });
+  // ── build-once state (rebuildable) ───────────────────────────────────────
+  // TdaiCore is built from the RESOLVED settings value (composition entry as
+  // base, `tdai-memory` settings section / settings.yaml as user layer), so
+  // keys stored in settings.yaml (llm.apiKey etc.) are honored. The settings
+  // inject callback that drives `installSettingsSection`'s setSource is
+  // scheduled by cordis as a plugin start — it ALWAYS runs after any 0ms
+  // timer — so the no-settings fallback below cannot be allowed to win the
+  // race. Instead of racing, we let the fallback build from the entry config
+  // first (guaranteeing a working core even without settings), and REBUILD
+  // from the resolved settings when the settings mount arrives. The fallback
+  // is a one-shot; the settings build always wins afterwards.
+  let core = null;
+  let tdaiConfig = null;
+  let dataDir = "";
+  let builtOnce = false;
 
   /** turn id of the last turn/end per session (capture trigger). */
   const lastTurnEnd = new Map();
@@ -169,6 +116,82 @@ function apply(ctx, config) {
   // flush, so L1 must finish inside the flush listener. In web mode the
   // long-lived process runs the pipeline in the background instead.
   const isOneShot = process.argv.some((arg) => arg === "headless");
+
+  // Verbose tdai-internal logging goes to the console only when explicitly
+  // enabled; routine diagnostics use the dsh logger.
+  const verbose = !!process.env.DSH_TDAI_DEBUG;
+  const log = (level, m) => {
+    if (verbose) console.error(`[tdai-memory] ${m}`);
+    else if (level === "warn") ctx.logger.warn(`[tdai-memory] ${m}`);
+    else if (level === "error") ctx.logger.error(`[tdai-memory] ${m}`);
+  };
+  const logger = {
+    debug: (m) => log("debug", m),
+    info: (m) => log("info", m),
+    warn: (m) => log("warn", m),
+    error: (m) => log("error", m),
+  };
+
+  // ── core construction (rebuildable) ──────────────────────────────────────
+  async function build(cfg) {
+    if (cfg?.llm?.apiKey) {
+      log("debug", `build: using settings config (apiKey=${cfg.llm.apiKey.slice(0, 6)}…)`);
+    }
+    // Tear down the previous core, if any (first build has none).
+    const previous = core;
+    if (previous) {
+      await previous.destroy().catch((error) => {
+        log("warn", `previous core destroy failed: ${String(error)}`);
+      });
+    }
+    dataDir = cfg.dataDir || join(os.homedir(), ".memory-tencentdb", "memory-tdai");
+    const nextConfig = parseConfig({
+      timezone: "system",
+      storeBackend: "sqlite",
+      capture: { enabled: cfg.captureEnabled },
+      extraction: { enabled: cfg.extraction.enabled, enableDedup: cfg.extraction.enableDedup },
+      recall: { ...cfg.recall },
+      embedding: {
+        enabled: true,
+        provider: "openai",
+        baseUrl: cfg.embedding.baseUrl,
+        apiKey: cfg.embedding.apiKey,
+        model: cfg.embedding.model,
+        dimensions: cfg.embedding.dimensions,
+        sendDimensions: cfg.embedding.sendDimensions,
+        timeoutMs: 10000,
+      },
+      llm: {
+        enabled: true,
+        baseUrl: cfg.llm.baseUrl || process.env.TDAI_LLM_BASE_URL || "",
+        apiKey: cfg.llm.apiKey || process.env.TDAI_LLM_API_KEY || "",
+        model: cfg.llm.model || process.env.TDAI_LLM_MODEL || "deepseek-v4-flash",
+        maxTokens: cfg.llm.maxTokens,
+        timeoutMs: cfg.llm.timeoutMs,
+      },
+    });
+    const nextHostAdapter = new StandaloneHostAdapter({
+      dataDir,
+      llmConfig: {
+        baseUrl: nextConfig.llm.baseUrl,
+        apiKey: nextConfig.llm.apiKey,
+        model: nextConfig.llm.model,
+        maxTokens: nextConfig.llm.maxTokens,
+        timeoutMs: nextConfig.llm.timeoutMs,
+      },
+      logger,
+      defaultUserId: "dsh-user",
+      platform: "dsh",
+    });
+    const nextCore = new TdaiCore({ hostAdapter: nextHostAdapter, config: nextConfig, instanceId: "dsh" });
+    // Publish before initialize so concurrent flush listeners already use the
+    // new core; initialize() only sets up stores/pipeline.
+    tdaiConfig = nextConfig;
+    core = nextCore;
+    await nextCore.initialize();
+    const key = nextConfig.llm.apiKey || "";
+    log("info", `initialized (dataDir=${dataDir}, llm=${nextConfig.llm.model}, apiKey=${key ? `${key.slice(0, 6)}…` : "<empty>"}, embedding=${nextConfig.embedding.model})`);
+  }
 
   // ── capture: triggered on session/flush (awaitable; runs before process
   //    exit in headless, and at every request boundary in web) ─────────────
@@ -190,7 +213,7 @@ function apply(ctx, config) {
       await captureTurn(session, startedAt);
       if (isOneShot) {
         // Run pending L1 extraction to completion before the process exits.
-        await core.handleSessionEnd(session.id).catch((error) => {
+        await core?.handleSessionEnd(session.id).catch((error) => {
           ctx.logger.warn(`[tdai-memory] L1 flush failed: ${String(error)}`);
         });
       }
@@ -200,7 +223,7 @@ function apply(ctx, config) {
   });
 
   async function captureTurn(session, startedAt) {
-    if (!tdaiConfig.capture.enabled) return;
+    if (!tdaiConfig?.capture.enabled) return;
     const derived = session.deriveMessages();
     const lastUserIdx = derived.map((m) => m.role).lastIndexOf("user");
     if (lastUserIdx < 0) return;
@@ -242,7 +265,7 @@ function apply(ctx, config) {
         if (!agent?.ctx) return;
         agent.ctx.on("system-prompt/assemble", async (assembly, context) => {
           try {
-            if (!tdaiConfig.recall.enabled) return assembly;
+            if (!tdaiConfig?.recall.enabled) return assembly;
             const lastUser = [...session.deriveMessages()].reverse().find((m) => m.role === "user");
             if (!lastUser) return assembly;
             const text = extractText(lastUser.content);
@@ -319,43 +342,50 @@ function apply(ctx, config) {
 
   // ── settings-backed configuration ─────────────────────────────────────────
   // The composition entry stays the base layer; a registered `tdai-memory`
-  // settings section overlays it (settings.yaml). TdaiCore is built once at
-  // startup, so changes apply after a restart — the namespace registration is
-  // what lets the Web UI surface and store them.
+  // settings section overlays it (settings.yaml). `installSettingsSection`
+  // hands `setSource` a GETTER (`() => scope.get()`), not the config object —
+  // we must call it to obtain the resolved settings. The settings mount
+  // (cordis inject) always arrives after our fallback timer, so the fallback
+  // builds the core from the entry config first (one-shot) and the settings
+  // build REBUILDS the core with the resolved values (apiKey included).
   installSettingsSection(ctx, NS, Config, config, {
-    setSource: (source) => {
-      build(source);
+    setSource: (getter) => {
+      builtOnce = true;
+      void build(getter());
     },
     onChange: () => {
-      if (started) ctx.logger.warn("[tdai-memory] settings updated; restart to apply (TdaiCore is built at startup)");
+      ctx.logger.warn("[tdai-memory] settings updated; restart to apply (TdaiCore is built at startup)");
     },
   });
 
+  // Fallback when no settings service ever mounts: build from the entry
+  // config. One-shot — if the settings mount arrives later, its build
+  // supersedes this one. Delayed past the 0ms window so headless/web boots
+  // are never blocked on this timer.
+  setTimeout(() => {
+    if (!builtOnce) {
+      builtOnce = true;
+      void build(config);
+    }
+  }, 500);
+
   // ── lifecycle ────────────────────────────────────────────────────────────
-  ctx.effect(async () => {
-    await core.initialize();
-    ctx.logger.info(`[tdai-memory] initialized (dataDir=${dataDir}, llm=${tdaiConfig.llm.model}, embedding=${tdaiConfig.embedding.model})`);
+  ctx.effect(() => {
     return async () => {
       // Final flush: run pending L1 extraction for every session seen this
       // process and wait for it to finish (headless exits right after the
       // tree disposes, so this is what makes extraction complete in one-shot
       // runs). Unknown keys are tolerated as no-ops.
       for (const sessionKey of seenSessions) {
-        await core.handleSessionEnd(sessionKey).catch((error) => {
+        await core?.handleSessionEnd(sessionKey).catch((error) => {
           ctx.logger.warn(`[tdai-memory] final L1 flush failed for ${sessionKey}: ${String(error)}`);
         });
       }
-      await core.destroy().catch((error) => {
+      await core?.destroy().catch((error) => {
         ctx.logger.warn(`[tdai-memory] destroy failed: ${String(error)}`);
       });
     };
-  }, "tdai-memory.initialize()");
-  }; // end build(cfg)
-
-  // Fallback when no settings service ever mounts: build from the entry config.
-  setTimeout(() => {
-    if (!started) build(config);
-  }, 0);
+  }, "tdai-memory.cleanup()");
 }
 
 export { Config, apply, inject, name };
