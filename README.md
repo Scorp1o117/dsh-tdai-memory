@@ -79,6 +79,35 @@ tdai-memory:
       sendDimensions: false
 ```
 
+## Install
+
+```bash
+dsh plugin --profile web add dsh-tdai-memory
+```
+
+then mount it in `$DSH_HOME/profiles/web/cordis.patch.yml`:
+
+```yaml
+- insert:
+    - id: tdai-memory
+      name: 'dsh-tdai-memory'
+      config: {}          # keys can live in settings.yaml instead
+```
+
+and restart `dsh web`. LLM/embedding API keys can be set in the Web UI
+settings page (记忆 / Memory) or directly in `settings.yaml` under
+`tdai-memory:`.
+
+> **Note for users**
+> - `dsh plugin` prints "declares no dsh.bundle — installed as a plain
+>   dependency" — **expected**: this plugin mounts via `cordis.patch.yml`.
+> - The settings section needs the `dsh-host-apiproxy` namespace allowlist;
+>   the plugin patches it automatically on first start — **restart `dsh web`
+>   once more** and the section appears. A dsh update overwrites the patch;
+>   the next plugin start re-applies it.
+> - Settings changes apply **after a restart** (TdaiCore is built at startup).
+> - Tested against DSH `0.1.0-rc.6`.
+
 ## Known trade-offs
 
 - **Extraction model**: `mimo-v2.5` extracts correctly but takes 20-30s per
