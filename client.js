@@ -126,10 +126,7 @@ window.__ModuleLoader__.load({
       var t = props.t;
       var scope = props.scope;
       var api = props.api;
-      var snapshot = react.useSyncExternalStore(
-        function (cb) { return scope.subscribe(cb); },
-        function () { return scope.getSnapshot(); }
-      );
+      var [snapshot, setSnapshot] = react.useState(function () { return scope.getSnapshot(); });
       var ready = snapshot.status === "ready" && snapshot.value !== void 0;
       var [draft, setDraft] = react.useState({});
       var [busy, setBusy] = react.useState(false);
@@ -138,12 +135,19 @@ window.__ModuleLoader__.load({
 
       react.useEffect(function () {
         scope.load();
-        return function () { scope.dispose(); };
+        var alive = true;
+        var sync = function () { if (alive) setSnapshot(scope.getSnapshot()); };
+        var un = typeof scope.subscribe === "function" ? scope.subscribe(sync) : null;
+        return function () { alive = false; if (un) un(); if (scope.dispose) scope.dispose(); };
       }, [scope]);
+      // Initialize the draft ONLY when the snapshot becomes ready — never on
+      // value churn. settingsScope.getSnapshot() returns a fresh object per
+      // call, so depending on snapshot.value would reset user input on every
+      // render (typing appears dead).
       react.useEffect(function () {
         if (ready) setDraft(Object.assign({}, valueToDraft(snapshot.value)));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [ready, snapshot.value]);
+      }, [ready]);
 
       if (snapshot.status === "unavailable") {
         return h("p", { className: "__tm_unavailable" }, t("unavailable"));
@@ -198,6 +202,7 @@ window.__ModuleLoader__.load({
             return;
           }
           setNotice(t("saved"));
+          if (response.result.value) setDraft(Object.assign({}, valueToDraft(response.result.value)));
           scope.load();
         }).catch(function (e) {
           setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
@@ -214,6 +219,7 @@ window.__ModuleLoader__.load({
           setBusy(false);
           if (!response.result.ok) { setError(t("error")); return; }
           setNotice(t("saved"));
+          if (response.result.value) setDraft(Object.assign({}, valueToDraft(response.result.value)));
           scope.load();
         }).catch(function (e) {
           setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
