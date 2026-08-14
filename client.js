@@ -228,8 +228,10 @@ window.__ModuleLoader__.load({
 
       var nodes = [];
       var lastGroup = null;
-      for (var i = 0; i < FIELDS.length; i += 1) {
-        var f = FIELDS[i];
+      // forEach callback gives each handler its own `f` — a `for (var i)`
+      // loop would share one `f` across every onChange closure, so typing
+      // updated the LAST field's draft and the input appeared dead.
+      FIELDS.forEach(function (f) {
         if (f.group !== lastGroup) {
           lastGroup = f.group;
           nodes.push(h("div", { key: "g" + f.group, className: "__tm_group" }, t(f.group)));
@@ -243,7 +245,7 @@ window.__ModuleLoader__.load({
               overridden ? h("span", { className: "__tm_override" }, t("overridden")) : null
             )
           ));
-          continue;
+          return;
         }
         nodes.push(h("label", { key: f.path.join("."), className: "__tm_field" },
           h("span", { className: "__tm_label" },
@@ -259,7 +261,7 @@ window.__ModuleLoader__.load({
           }),
           f.type === "password" ? h("span", { className: "__tm_hint" }, t("secretHint")) : null
         ));
-      }
+      });
 
       return h("div", { className: "__tm_root" },
         h("p", { className: "__tm_hint", style: { margin: "0 0 4px" } }, t("intro")),
