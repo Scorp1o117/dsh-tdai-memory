@@ -58,8 +58,9 @@ const Config = z.object({
   /** L1 extraction pipeline (facts from conversations). */
   extraction: z.object({
     enabled: z.boolean().default(true),
-    /** Conflict detection before storing; extra LLM call, disable if flaky. */
-    enableDedup: z.boolean().default(true),
+    /** Conflict detection before storing; extra LLM call, disable if flaky.
+     *  Off by default: dedup LLM output parsing is flaky (README matches). */
+    enableDedup: z.boolean().default(false),
   }),
   /** Recall injection settings. */
   recall: z.object({
