@@ -74,6 +74,20 @@ const Config = z.object({
   toolsEnabled: z.boolean().default(true),
 });
 
+/**
+ * Whether a derived message is real human input.
+ *
+ * A `"user"` role alone is not enough: DSH injects synthetic user-role
+ * context (system reminders, runtime context, skill catalogs, goal rounds,
+ * tool results, …) that must never be treated as user input. Real input is
+ * distinguished by `message.source.kind === "user"` (see dsh-llm Message
+ * types). Messages without a `source` (older harnesses) are treated as real
+ * input to stay compatible.
+ */
+function isRealUserMessage(m) {
+  return m?.role === "user" && (m.source == null || m.source.kind === "user");
+}
+
 /** Extract plain text from a dsh message content (block array or string). */
 function extractText(content) {
   if (typeof content === "string") return content.trim();
@@ -227,11 +241,19 @@ function apply(ctx, config) {
   async function captureTurn(session, startedAt) {
     if (!tdaiConfig?.capture.enabled) return;
     const derived = session.deriveMessages();
-    const lastUserIdx = derived.map((m) => m.role).lastIndexOf("user");
+    // Start from the last REAL user message. DSH injects synthetic user-role
+    // context (system reminders, runtime context, skill catalogs, goal
+    // rounds, …) whose `source.kind` is not "user"; those must not pollute
+    // L0 memory (issue #1).
+    const lastUserIdx = derived.findLastIndex(isRealUserMessage);
     if (lastUserIdx < 0) return;
     const messages = derived
       .slice(lastUserIdx)
       .map((m) => {
+        // Keep assistant replies and real user input only; drop synthetic
+        // user-role messages (plugin context, tool results, …) injected
+        // after the last real user message.
+        if (m.role !== "assistant" && !isRealUserMessage(m)) return null;
         const text = extractText(m.content);
         if (!text) return null;
         return {
@@ -268,7 +290,7 @@ function apply(ctx, config) {
         agent.ctx.on("system-prompt/assemble", async (assembly, context) => {
           try {
             if (!tdaiConfig?.recall.enabled) return assembly;
-            const lastUser = [...session.deriveMessages()].reverse().find((m) => m.role === "user");
+            const lastUser = [...session.deriveMessages()].reverse().find(isRealUserMessage);
             if (!lastUser) return assembly;
             const text = extractText(lastUser.content);
             if (!text) return assembly;

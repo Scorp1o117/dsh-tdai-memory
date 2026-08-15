@@ -38,7 +38,13 @@ function apply(ctx, config) {
       if (!agent) return assembly;
       const session = agent.session;
       if (!session) return assembly;
-      const lastUser = [...session.deriveMessages()].reverse().find((m) => m.role === "user");
+      // Only real human input triggers recall. DSH injects synthetic
+      // user-role context (system reminders, runtime context, skill
+      // catalogs, …) whose source.kind is not "user"; recalling on those
+      // would pollute the prompt with irrelevant memories (issue #1).
+      const lastUser = [...session.deriveMessages()]
+        .reverse()
+        .find((m) => m.role === "user" && (m.source == null || m.source.kind === "user"));
       if (!lastUser) return assembly;
       const text = extractText(lastUser.content);
       if (!text || text.length < config.minUserTextChars) return assembly;
