@@ -1,0 +1,8 @@
+# dsh-tdai-memory — bundle patch layer
+#
+# Declares the plugin as a Cordis loader entry, making the package a standard
+# profile bundle: `dsh plugin --profile <p> add dsh-tdai-memory` installs and
+# mounts it without manual cordis.patch.yml edits.
+- insert:
+    - id: tdai-memory
+      name: 'dsh-tdai-memory'
