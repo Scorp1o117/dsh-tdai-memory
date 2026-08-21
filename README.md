@@ -111,7 +111,14 @@ settings page (记忆 / Memory) or directly in `settings.yaml` under
 >   once more** and the section appears. A dsh update overwrites the patch;
 >   the next plugin start re-applies it.
 > - Settings changes apply **after a restart** (TdaiCore is built at startup).
-> - Tested against DSH `0.1.0-rc.6`, `0.1.0-rc.7`, and `0.1.0-rc.8`.
+> - Tested against DSH `0.1.0-rc.6`, `0.1.0-rc.7`, `0.1.0-rc.8`, and
+>   `0.1.1-rc.1`.
+
+`node-llama-cpp` is an optional peer used only by the fully local embedding
+backend. It is intentionally not installed by default because its native build
+requires explicit pnpm build approval. Remote OpenAI-compatible embeddings do
+not need it. Users who select the local backend should install and approve
+`node-llama-cpp` in the target DSH profile separately.
 
 ## Known trade-offs
 

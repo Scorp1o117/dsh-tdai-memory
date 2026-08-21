@@ -18,6 +18,10 @@
 
 数据目录复用现有 `~/.memory-tencentdb/memory-tdai`，**旧记忆无缝继承**。
 
+`node-llama-cpp` 仅供完全本地的 embedding 后端使用，现在声明为可选 peer，默认安装不会再触发原生构建脚本。使用 OpenAI 兼容远程 embedding 时不需要它；选择本地后端的用户需在目标 DSH profile 中单独安装并批准 `node-llama-cpp` 的构建。
+
+已针对 DSH `0.1.0-rc.6`、`0.1.0-rc.7`、`0.1.0-rc.8` 和 `0.1.1-rc.1` 测试。
+
 ## 架构（移植方式）
 
 | 层 | 内容 |
