@@ -106,13 +106,13 @@ settings page (记忆 / Memory) or directly in `settings.yaml` under
 > - This plugin is a standard **profile bundle** (`dsh.bundle.patch`):
 >   `dsh plugin --profile web add dsh-tdai-memory` installs and mounts it in
 >   one step — no manual `cordis.patch.yml` edits needed.
-> - The settings section needs the `dsh-host-apiproxy` namespace allowlist;
->   the plugin patches it automatically on first start — **restart `dsh web`
->   once more** and the section appears. A dsh update overwrites the patch;
->   the next plugin start re-applies it.
+> - DSH exposes the registered `tdai-memory` settings namespace directly; the
+>   plugin does not modify files in the host installation.
 > - Settings changes apply **after a restart** (TdaiCore is built at startup).
-> - Tested against DSH `0.1.0-rc.6`, `0.1.0-rc.7`, `0.1.0-rc.8`, and
->   `0.1.1-rc.1`.
+> - Version 0.2.13 and newer require DSH `0.1.0-rc.7` or newer and are tested
+>   against `0.1.0-rc.7`, `0.1.0-rc.8`, and `0.1.1-rc.1`.
+> - DSH `0.1.0-rc.6` users must pin `dsh-tdai-memory@0.2.11`, the last release
+>   carrying the legacy settings-allowlist compatibility patch.
 
 `node-llama-cpp` is an optional peer used only by the fully local embedding
 backend. It is intentionally not installed by default because its native build
