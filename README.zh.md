@@ -70,3 +70,4 @@ tdai-memory:
 - **dedup**：LLM 冲突检测输出解析不稳（曾导致 stored=0），默认关闭；开启需换更稳的模型
 - **L1 记忆向量**：随存储写入（8088 embedding 快）；L0 向量走后台任务，headless 退出时由 `destroy()` drain
 - **升级**：上游拉新代码后，在 tdai 项目目录重跑 `npx tsc -p dsh-tsconfig.json`（产物在 `dist-dsh/`）
+

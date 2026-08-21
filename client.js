@@ -172,7 +172,7 @@ window.__ModuleLoader__.load({
       var [error, setError] = react.useState(null);
 
       react.useEffect(function () {
-        scope.load();
+        if (typeof scope.load === "function") scope.load();
         var alive = true;
         var sync = function () { if (alive) setSnapshot(scope.getSnapshot()); };
         var un = typeof scope.subscribe === "function" ? scope.subscribe(sync) : null;
@@ -241,7 +241,7 @@ window.__ModuleLoader__.load({
           }
           setNotice(t("saved"));
           if (response.result.value) setDraft(Object.assign({}, valueToDraft(response.result.value)));
-          scope.load();
+          if (typeof scope.load === "function") scope.load();
         }).catch(function (e) {
           setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
         });
@@ -258,7 +258,7 @@ window.__ModuleLoader__.load({
           if (!response.result.ok) { setError(t("error")); return; }
           setNotice(t("saved"));
           if (response.result.value) setDraft(Object.assign({}, valueToDraft(response.result.value)));
-          scope.load();
+          if (typeof scope.load === "function") scope.load();
         }).catch(function (e) {
           setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
         });
@@ -347,3 +347,4 @@ window.__ModuleLoader__.load({
     return module.exports;
   }
 });
+

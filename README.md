@@ -111,7 +111,7 @@ settings page (记忆 / Memory) or directly in `settings.yaml` under
 >   once more** and the section appears. A dsh update overwrites the patch;
 >   the next plugin start re-applies it.
 > - Settings changes apply **after a restart** (TdaiCore is built at startup).
-> - Tested against DSH `0.1.0-rc.6`.
+> - Tested against DSH `0.1.0-rc.6`, `0.1.0-rc.7`, and `0.1.0-rc.8`.
 
 ## Known trade-offs
 
@@ -128,3 +128,4 @@ settings page (记忆 / Memory) or directly in `settings.yaml` under
 ## License
 
 MIT
+
