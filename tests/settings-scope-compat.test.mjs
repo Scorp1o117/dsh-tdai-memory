@@ -17,6 +17,15 @@ test('settings scope refresh is compatible with DSH rc7 through 0.1.1-rc.1', () 
   assert.equal(calls, 1);
 });
 
+test('section unmount must not dispose the plugin-shared settings scope', () => {
+  // The settings scope is bound once in the plugin apply() and shared across
+  // every mount of the section. Disposing it on a section unmount leaves a
+  // frozen (stopped) scope, so a later remount derives from the stopped scope
+  // and shows stale values on the next describe.
+  assert.doesNotMatch(clientSource, /if \(scope\.dispose\) scope\.dispose\(\)/);
+  assert.doesNotMatch(clientSource, /scope\.dispose\(\)/);
+});
+
 test('package requires a DSH host that exposes plugin settings natively', () => {
   for (const [name, range] of Object.entries(manifest.peerDependencies)) {
     if (!name.startsWith('@deepseek-ai/dsh-')) continue;
