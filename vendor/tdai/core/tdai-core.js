@@ -359,6 +359,10 @@ export class TdaiCore {
                     maxTokens: this.cfg.llm.maxTokens,
                     timeoutMs: this.cfg.llm.timeoutMs,
                     disableThinking: this.cfg.llm.disableThinking,
+                    sendSessionHeader: this.cfg.llm.sendSessionHeader,
+                    sessionHeaderName: this.cfg.llm.sessionHeaderName,
+                    sessionId: this.cfg.llm.sessionId,
+                    dataDir: this.dataDir,
                 },
                 logger: this.logger,
             });

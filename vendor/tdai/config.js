@@ -257,6 +257,9 @@ export function parseConfig(raw) {
                 maxTokens: num(llmGroup, "maxTokens") ?? 4096,
                 timeoutMs: num(llmGroup, "timeoutMs") ?? 120_000,
                 disableThinking: normalizeDisableThinking(boolOrStr(llmGroup, "disableThinking")),
+                sendSessionHeader: bool(llmGroup, "sendSessionHeader") ?? true,
+                sessionHeaderName: str(llmGroup, "sessionHeaderName") ?? "x-opencode-session",
+                sessionId: str(llmGroup, "sessionId") ?? "",
             };
         })(),
         offload,

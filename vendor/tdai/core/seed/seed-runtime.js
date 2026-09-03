@@ -50,6 +50,10 @@ async function createSeedPipeline(opts) {
                 maxTokens: cfg.llm.maxTokens,
                 timeoutMs: cfg.llm.timeoutMs,
                 disableThinking: cfg.llm.disableThinking,
+                sendSessionHeader: cfg.llm.sendSessionHeader,
+                sessionHeaderName: cfg.llm.sessionHeaderName,
+                sessionId: cfg.llm.sessionId,
+                dataDir: outputDir,
             },
             logger,
         });

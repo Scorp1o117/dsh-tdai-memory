@@ -63,6 +63,8 @@ tdai-memory:
     llm:                      # L1/L2/L3 提取模型（OpenAI 兼容）
       baseUrl: 'https://opencode.ai/zen/go/v1'
       model: 'mimo-v2.5'      # deepseek-v4-flash 对提取 JSON 输出不合格
+      sendSessionHeader: true # 给 LLM 请求带 x-opencode-session（OpenCode Go 等网关要求）
+      sessionId: ''           # 固定会话 ID；留空 = 数据目录下自动持久化 ID（重启不变）
     embedding:                # 向量（OpenAI 兼容 /v1/embeddings）
       baseUrl: 'http://127.0.0.1:8088/v1'
       model: 'Qwen3-Embedding-0.6B'

@@ -76,6 +76,8 @@ tdai-memory:
     llm:                      # L1/L2/L3 extraction model (OpenAI-compatible)
       baseUrl: 'https://opencode.ai/zen/go/v1'
       model: 'mimo-v2.5'      # deepseek-v4-flash produces invalid extraction JSON
+      sendSessionHeader: true # send x-opencode-session on LLM requests (required by OpenCode Go & similar gateways)
+      sessionId: ''           # fixed session id; empty = persistent auto id under the data dir
     embedding:                # vectors (OpenAI-compatible /v1/embeddings)
       baseUrl: 'http://127.0.0.1:8088/v1'
       model: 'Qwen3-Embedding-0.6B'

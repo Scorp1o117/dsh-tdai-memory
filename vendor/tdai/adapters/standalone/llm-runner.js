@@ -21,6 +21,7 @@ import { generateText, tool, stepCountIs, jsonSchema } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { report } from "../../core/report/reporter.js";
 import { createNoThinkFetch } from "../../utils/no-think-fetch.js";
+import { resolvePersistentSessionId, sessionHeaderOf } from "../../utils/session-header-fetch.js";
 const TAG = "[memory-tdai] [standalone-runner]";
 // Max iterations in the tool-call loop to prevent infinite loops
 const MAX_TOOL_ITERATIONS = 20;
@@ -132,6 +133,7 @@ export class StandaloneLLMRunner {
     enableTools;
     logger;
     customFetch;
+    sessionIdPromise;
     constructor(opts) {
         this.config = opts.config;
         this.model = opts.model ?? opts.config.model;
@@ -140,6 +142,37 @@ export class StandaloneLLMRunner {
         this.customFetch = opts.config.disableThinking
             ? createNoThinkFetch(opts.config.disableThinking)
             : undefined;
+        // Resolve the persistent session id lazily (async, cached). Only needed
+        // when the session header is enabled and no fixed sessionId is set.
+        const { sendSessionHeader, sessionId, dataDir } = opts.config;
+        if (sendSessionHeader === false || (sessionId && String(sessionId).trim())) {
+            this.sessionIdPromise = Promise.resolve(String(sessionId ?? "").trim());
+        }
+        else {
+            this.sessionIdPromise = resolvePersistentSessionId(dataDir);
+        }
+    }
+    async buildProvider() {
+        const providerOptions = {
+            baseURL: this.config.baseUrl,
+            apiKey: this.config.apiKey,
+            compatibility: "compatible",
+            ...(this.customFetch ? { fetch: this.customFetch } : {}),
+        };
+        // x-opencode-session: stable per-conversation id header.
+        if (this.config.sendSessionHeader !== false) {
+            const persistentId = await this.sessionIdPromise;
+            const header = sessionHeaderOf({
+                send: this.config.sendSessionHeader,
+                headerName: this.config.sessionHeaderName,
+                sessionId: this.config.sessionId,
+                persistentId,
+            });
+            if (header) {
+                providerOptions.headers = { ...(providerOptions.headers ?? {}), ...header };
+            }
+        }
+        return createOpenAI(providerOptions);
     }
     async run(params) {
         const runStartMs = Date.now();
@@ -151,12 +184,7 @@ export class StandaloneLLMRunner {
         // Create OpenAI-compatible provider via AI SDK
         // Use "compatible" mode to call /chat/completions (not Responses API),
         // which works with all OpenAI-compatible backends (DeepSeek, Qwen, etc.)
-        const provider = createOpenAI({
-            baseURL: this.config.baseUrl,
-            apiKey: this.config.apiKey,
-            compatibility: "compatible",
-            ...(this.customFetch ? { fetch: this.customFetch } : {}),
-        });
+        const provider = await this.buildProvider();
         // For pure text tasks like L1 extraction, avoid exposing any tools.
         const tools = this.enableTools
             ? createSandboxedTools(workspaceDir, this.logger)

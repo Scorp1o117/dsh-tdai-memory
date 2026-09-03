@@ -21,7 +21,6 @@ import os from "node:os";
 import { join } from "node:path";
 import z from "@deepseek-ai/schemastery";
 import { defineTool } from "@deepseek-ai/dsh-tools";
-import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import { TdaiCore } from "./vendor/tdai/core/tdai-core.js";
 import { parseConfig } from "./vendor/tdai/config.js";
 import { StandaloneHostAdapter } from "./vendor/tdai/adapters/standalone/host-adapter.js";
@@ -31,7 +30,7 @@ const name = "tdai-memory";
 /** Services this row injects. */
 const inject = ["sessions", "systemPrompt", "tools"];
 /** Settings namespace owned by this plugin (Web UI settings section). */
-const NS = settingsNamespace("tdai-memory");
+const NS = "tdai-memory";
 
 /** Runtime schema for the tdai-memory row. */
 const Config = z.object({
@@ -44,6 +43,15 @@ const Config = z.object({
     model: z.string().default(""),
     maxTokens: z.number().default(4096),
     timeoutMs: z.number().default(120000),
+    /** Send a stable session-id header on LLM requests. OpenCode Go and other
+     *  gateways require `x-opencode-session` on every request; missing it may
+     *  error after 2026-09-06. Value: `sessionId` below, else a persistent
+     *  per-instance random id stored under the data dir. */
+    sendSessionHeader: z.boolean().default(true),
+    /** Header name carrying the session id. */
+    sessionHeaderName: z.string().default("x-opencode-session"),
+    /** Fixed session id for LLM requests; empty = persistent auto id. */
+    sessionId: z.string().default(""),
   }),
   /** Embedding endpoint (OpenAI-compatible /v1/embeddings). */
   embedding: z.object({
@@ -183,6 +191,9 @@ function apply(ctx, config) {
         model: cfg.llm.model || process.env.TDAI_LLM_MODEL || "deepseek-v4-flash",
         maxTokens: cfg.llm.maxTokens,
         timeoutMs: cfg.llm.timeoutMs,
+        sendSessionHeader: cfg.llm.sendSessionHeader,
+        sessionHeaderName: cfg.llm.sessionHeaderName,
+        sessionId: cfg.llm.sessionId,
       },
     });
     const nextHostAdapter = new StandaloneHostAdapter({
@@ -193,6 +204,10 @@ function apply(ctx, config) {
         model: nextConfig.llm.model,
         maxTokens: nextConfig.llm.maxTokens,
         timeoutMs: nextConfig.llm.timeoutMs,
+        sendSessionHeader: nextConfig.llm.sendSessionHeader,
+        sessionHeaderName: nextConfig.llm.sessionHeaderName,
+        sessionId: nextConfig.llm.sessionId,
+        dataDir,
       },
       logger,
       defaultUserId: "dsh-user",
@@ -365,20 +380,27 @@ function apply(ctx, config) {
 
   // ── settings-backed configuration ─────────────────────────────────────────
   // The composition entry stays the base layer; a registered `tdai-memory`
-  // settings section overlays it (settings.yaml). `installSettingsSection`
-  // hands `setSource` a GETTER (`() => scope.get()`), not the config object —
-  // we must call it to obtain the resolved settings. The settings mount
-  // (cordis inject) always arrives after our fallback timer, so the fallback
-  // builds the core from the entry config first (one-shot) and the settings
-  // build REBUILDS the core with the resolved values (apiKey included).
-  installSettingsSection(ctx, NS, Config, config, {
-    setSource: (getter) => {
+  // settings section overlays it (settings.yaml). The source is a GETTER
+  // (`() => scope.get()`), not the config object — we must call it to obtain
+  // the resolved settings. The settings mount (cordis inject) always arrives
+  // after our fallback timer, so the fallback builds the core from the entry
+  // config first (one-shot) and the settings build REBUILDS the core with the
+  // resolved values (apiKey included).
+  // Compat shim: dsh-settings 0.1.2-rc.1 removed the module-level
+  // `installSettingsSection` export (the provider now lives at ctx.settings).
+  // Inline the same logic via ctx.inject(["settings"]) — works on both
+  // 0.1.1 (module export wrapper) and 0.1.2 (ctx.settings) hosts.
+  ctx.inject(["settings"], (sctx) => {
+    const scope = sctx.settings.register(NS, Config, { base: config });
+    const fire = () => {
       builtOnce = true;
-      void build(getter());
-    },
-    onChange: () => {
+      void build(scope.get());
+    };
+    sctx.effect(() => () => {});
+    fire();
+    scope.watch(() => {
       ctx.logger.warn("[tdai-memory] settings updated; restart to apply (TdaiCore is built at startup)");
-    },
+    });
   });
 
   // Fallback when no settings service ever mounts: build from the entry
