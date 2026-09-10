@@ -185,7 +185,10 @@ window.__ModuleLoader__.load({
       var [error, setError] = react.useState(null);
 
       react.useEffect(function () {
-        if (typeof scope.load === "function") scope.load();
+        // No refresh call: the scope's public seam has no load() — reads ride the
+        // shared describe mirror, which re-reads on every Host
+        // `settings/document-updated`. The guarded scope.load() that used to sit
+        // here was dead code that read like a refresh that never happened.
         var alive = true;
         var sync = function () { if (alive) setSnapshot(scope.getSnapshot()); };
         var un = typeof scope.subscribe === "function" ? scope.subscribe(sync) : null;
@@ -258,7 +261,6 @@ window.__ModuleLoader__.load({
           }
           setNotice(t("saved"));
           if (response.result.value) setDraft(Object.assign({}, valueToDraft(response.result.value)));
-          if (typeof scope.load === "function") scope.load();
         }).catch(function (e) {
           setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
         });
@@ -275,7 +277,6 @@ window.__ModuleLoader__.load({
           if (!response.result.ok) { setError(t("error")); return; }
           setNotice(t("saved"));
           if (response.result.value) setDraft(Object.assign({}, valueToDraft(response.result.value)));
-          if (typeof scope.load === "function") scope.load();
         }).catch(function (e) {
           setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
         });
