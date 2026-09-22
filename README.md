@@ -11,6 +11,14 @@ Part of the [DeepSeek Harness Enhancement Suite](https://github.com/Scorp1o117/d
 A port of **TencentDB Agent Memory** (Tencent Cloud's open-source four-layer
 memory system, originally an OpenClaw plugin) into DeepSeek Harness.
 
+## Compatibility (v0.3.3)
+
+Verified in a DSH `0.1.5-rc.3` (`next`) disposable Web profile; DSH
+`0.1.5-rc.2` remains `latest`. The rc.3 host currently references an
+unpublished `dsh-client-ui-sidebar-documentpreview@0.1.5-rc.3`, so the smoke
+profile temporarily used that unrelated UI package at rc.2. A clean rc.3
+installation is blocked upstream. Alpha releases remain `unknown`.
+
 ## Features
 
 - **L0 conversation capture**: every turn (turn end, request boundary) is

@@ -8,6 +8,13 @@
 
 把 **TencentDB Agent Memory**（腾讯云开源的四层记忆系统，原为 OpenClaw 插件）移植进 DeepSeek Harness。
 
+## 兼容性（v0.3.3）
+
+已在 DSH `0.1.5-rc.3`（`next`）的一次性 Web Profile 中验证；`0.1.5-rc.2`
+仍是 `latest`。rc.3 宿主目前引用尚未发布的
+`dsh-client-ui-sidebar-documentpreview@0.1.5-rc.3`，烟测仅将这一无关的 UI
+包临时回退为 rc.2；rc.3 原样安装仍受上游阻塞。alpha 版本继续标记 `unknown`。
+
 ## 能力
 
 - **L0 对话捕获**：每轮对话（turn 结束、请求边界）自动写入原始对话（JSONL + SQLite + FTS + 向量）
