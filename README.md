@@ -11,13 +11,11 @@ Part of the [DeepSeek Harness Enhancement Suite](https://github.com/Scorp1o117/d
 A port of **TencentDB Agent Memory** (Tencent Cloud's open-source four-layer
 memory system, originally an OpenClaw plugin) into DeepSeek Harness.
 
-## Compatibility (v0.3.3)
+## Compatibility (v0.3.4)
 
-Verified in a DSH `0.1.5-rc.3` (`next`) disposable Web profile; DSH
-`0.1.5-rc.2` remains `latest`. The rc.3 host currently references an
-unpublished `dsh-client-ui-sidebar-documentpreview@0.1.5-rc.3`, so the smoke
-profile temporarily used that unrelated UI package at rc.2. A clean rc.3
-installation is blocked upstream. Alpha releases remain `unknown`.
+Targets DSH `0.1.7-rc.1` (`next`); npm `latest` is `0.1.5-rc.3`.
+Settings now live in the Profile patch, and the browser uses `configForms`.
+Older hosts require an older plugin release; alpha builds remain `unknown`.
 
 ## Features
 
@@ -58,23 +56,14 @@ Hard-won wiring details:
 
 ## Configuration (profile patch + settings)
 
-Configuration is **settings-namespace driven**: the profile patch is the base
-layer, and the `tdai-memory:` section of `$DSH_HOME/settings.yaml` overrides it
-(LLM/embedding keys live in settings.yaml). The **Web UI Settings → 记忆**
+Configuration is stored in the `tdai-memory` entry of the active Profile patch.
+On first launch, DSH imports the old `$DSH_HOME/settings.yaml` values into that
+entry. The **Web UI Settings → 记忆**
 section edits every field (v0.2.0, write-only keys); TdaiCore is built at
 startup, so changes apply **after a restart**.
 
 ```yaml
-# $DSH_HOME/settings.yaml
-tdai-memory:
-  llm:
-    apiKey: 'sk-...'
-  embedding:
-    apiKey: 'local-no-key'
-```
-
-```yaml
-# profile patch (base layer)
+# $DSH_HOME/profiles/web/cordis.patch.yml
 - id: tdai-memory
   name: 'dsh-tdai-memory'
   config:
@@ -105,12 +94,11 @@ then mount it in `$DSH_HOME/profiles/web/cordis.patch.yml`:
 - insert:
     - id: tdai-memory
       name: 'dsh-tdai-memory'
-      config: {}          # keys can live in settings.yaml instead
+      config: {}          # fill through Settings → 记忆
 ```
 
 and restart `dsh web`. LLM/embedding API keys can be set in the Web UI
-settings page (记忆 / Memory) or directly in `settings.yaml` under
-`tdai-memory:`.
+settings page (记忆 / Memory) or in the `tdai-memory` Profile patch entry.
 
 > **Note for users**
 > - This plugin is a standard **profile bundle** (`dsh.bundle.patch`):

@@ -52,7 +52,7 @@ const Config = z.object({
     sessionHeaderName: z.string().default("x-opencode-session"),
     /** Fixed session id for LLM requests; empty = persistent auto id. */
     sessionId: z.string().default(""),
-  }),
+  }).default({}),
   /** Embedding endpoint (OpenAI-compatible /v1/embeddings). */
   embedding: z.object({
     baseUrl: z.string().default("http://127.0.0.1:8088/v1"),
@@ -60,7 +60,7 @@ const Config = z.object({
     model: z.string().default("Qwen3-Embedding-0.6B"),
     dimensions: z.number().default(1024),
     sendDimensions: z.boolean().default(false),
-  }),
+  }).default({}),
   /** Capture conversations into L0. */
   captureEnabled: z.boolean().default(true),
   /** L1 extraction pipeline (facts from conversations). */
@@ -69,17 +69,17 @@ const Config = z.object({
     /** Conflict detection before storing; extra LLM call, disable if flaky.
      *  Off by default: dedup LLM output parsing is flaky (README matches). */
     enableDedup: z.boolean().default(false),
-  }),
+  }).default({}),
   /** Recall injection settings. */
   recall: z.object({
     enabled: z.boolean().default(true),
     maxResults: z.number().default(5),
     scoreThreshold: z.number().default(0.3),
     timeoutMs: z.number().default(3000),
-  }),
+  }).default({}),
   /** Register the two search tools. */
   toolsEnabled: z.boolean().default(true),
-});
+}).volatile();
 
 /**
  * Whether a derived message is real human input.
@@ -390,17 +390,8 @@ function apply(ctx, config) {
   // `installSettingsSection` export (the provider now lives at ctx.settings).
   // Inline the same logic via ctx.inject(["settings"]) — works on both
   // 0.1.1 (module export wrapper) and 0.1.2 (ctx.settings) hosts.
-  ctx.inject(["settings"], (sctx) => {
-    const scope = sctx.settings.register(NS, Config, { base: config });
-    const fire = () => {
-      builtOnce = true;
-      void build(scope.get());
-    };
-    sctx.effect(() => () => {});
-    fire();
-    scope.watch(() => {
-      ctx.logger.warn("[tdai-memory] settings updated; restart to apply (TdaiCore is built at startup)");
-    });
+  ctx.on("settings/document-updated", (id) => {
+    if (id === NS) ctx.logger.warn("[tdai-memory] settings updated; restart to apply (TdaiCore is built at startup)");
   });
 
   // Fallback when no settings service ever mounts: build from the entry
@@ -410,7 +401,7 @@ function apply(ctx, config) {
   setTimeout(() => {
     if (!builtOnce) {
       builtOnce = true;
-      void build(config);
+      void build(typeof config.get === "function" ? config.get() : config);
     }
   }, 500);
 

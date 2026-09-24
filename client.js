@@ -47,7 +47,7 @@ window.__ModuleLoader__.load({
 
     // ── locale ────────────────────────────────────────────────────────────
     var NS = "tdaiMemory";
-    var inject = ["slots", "locale", "settingsScope", "connection"];
+    var inject = ["slots", "locale", "configForms", "connection"];
     var zh = {
       nav: "记忆",
       intro: "TDAI 记忆配置：L0 捕获 → L1 结构化提取 → 召回注入。密钥只写不读。TdaiCore 在启动时构建，修改后需重启生效。",
@@ -345,7 +345,7 @@ window.__ModuleLoader__.load({
     function apply(ctx) {
       var t = ctx.locale.bind(NS);
       ctx.effect(function () { return ctx.locale.register(NS, { zh: zh, en: en }); }, "dsh-tdai-memory: dictionaries");
-      var scope = ctx.settingsScope.bind({ namespace: "tdai-memory" });
+      var scope = ctx.configForms.get("tdai-memory");
       var api = ctx.connection.api;
       ctx.slots.inject("settings.section", function () {
         return ctx.slots.register({
