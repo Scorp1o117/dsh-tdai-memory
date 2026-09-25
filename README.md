@@ -11,9 +11,9 @@ Part of the [DeepSeek Harness Enhancement Suite](https://github.com/Scorp1o117/d
 A port of **TencentDB Agent Memory** (Tencent Cloud's open-source four-layer
 memory system, originally an OpenClaw plugin) into DeepSeek Harness.
 
-## Compatibility (v0.3.4)
+## Compatibility (v0.3.5)
 
-Targets DSH `0.1.7-rc.1` (`next`); npm `latest` is `0.1.5-rc.3`.
+Tested with DSH `0.1.7-rc.1` and `0.1.7-rc.2` (`next`); npm `latest` is `0.1.5-rc.3`.
 Settings now live in the Profile patch, and the browser uses `configForms`.
 Older hosts require an older plugin release; alpha builds remain `unknown`.
 
