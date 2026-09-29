@@ -8,11 +8,20 @@
 
 把 **TencentDB Agent Memory**（腾讯云开源的四层记忆系统，原为 OpenClaw 插件）移植进 DeepSeek Harness。
 
-## 兼容性（v0.3.5）
+## 兼容性（v0.3.6）
 
-已验证 DSH `0.1.7-rc.1` 与 `0.1.7-rc.2`（npm `next`）；npm `latest` 是 `0.1.5-rc.3`。
-设置保存在当前 Profile patch，Web 端使用 `configForms`。
-旧宿主请使用插件旧版；alpha 构建仍标记 `unknown`。
+已在 DSH `0.1.7-rc.2`（Web）与 `0.2.0-rc.2`（桌面端运行时）的一次性 Profile 验证。桌面端使用独立的 `desktop` Profile；其他预发布版本暂未验证。
+
+## 桌面端安装
+
+在桌面端的“插件”页面安装，或使用桌面端“应用 → 管理 dsh 命令”注册的命令：
+
+```powershell
+dsh plugin --profile desktop add dsh-tdai-memory@0.3.6
+```
+
+重启桌面端以加载客户端插件。配置位于 `$DSH_HOME/profiles/desktop`。
+
 
 ## 能力
 

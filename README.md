@@ -11,11 +11,20 @@ Part of the [DeepSeek Harness Enhancement Suite](https://github.com/Scorp1o117/d
 A port of **TencentDB Agent Memory** (Tencent Cloud's open-source four-layer
 memory system, originally an OpenClaw plugin) into DeepSeek Harness.
 
-## Compatibility (v0.3.5)
+## Compatibility (v0.3.6)
 
-Tested with DSH `0.1.7-rc.1` and `0.1.7-rc.2` (`next`); npm `latest` is `0.1.5-rc.3`.
-Settings now live in the Profile patch, and the browser uses `configForms`.
-Older hosts require an older plugin release; alpha builds remain `unknown`.
+Verified with DSH `0.1.7-rc.2` (Web) and `0.2.0-rc.2` (Desktop runtime) in isolated profiles. The Desktop app uses its own `desktop` profile. Other DSH prereleases remain unverified.
+
+## Desktop install
+
+Use the Desktop-installed `dsh` command (Application → Manage dsh Command), or the app’s Plugins page. Then install into the Desktop profile:
+
+```powershell
+dsh plugin --profile desktop add dsh-tdai-memory@0.3.6
+```
+
+Restart the Desktop app to load the client bundle. Desktop keeps its profile under `$DSH_HOME/profiles/desktop`.
+
 
 ## Features
 
