@@ -1,7 +1,7 @@
 /**
  * dsh-tdai-memory — browser half.
  *
- * A "记忆" section inside the Web UI settings page: edits the `tdai-memory`
+ * A configuration page inside the sidebar Plugins page: edits `tdai-memory`
  * settings namespace (data dir, extraction LLM, embeddings, capture/extract/
  * recall switches, tools) through the settings scope transport plus nested
  * `settings.mutate` ops. TdaiCore is built at startup, so changes apply
@@ -47,7 +47,7 @@ window.__ModuleLoader__.load({
 
     // ── locale ────────────────────────────────────────────────────────────
     var NS = "tdaiMemory";
-    var inject = ["slots", "locale", "configForms", "connection"];
+    var inject = ["slots", "locale", "configForms"];
     var zh = {
       nav: "记忆",
       intro: "TDAI 记忆配置：L0 捕获 → L1 结构化提取 → 召回注入。密钥只写不读。TdaiCore 在启动时构建，修改后需重启生效。",
@@ -88,6 +88,7 @@ window.__ModuleLoader__.load({
       saved: "已保存（重启后生效）",
       saving: "保存中…",
       error: "保存失败",
+      notApplied: "写入未生效，请检查配置后重试",
       unavailable: "设置命名空间不可用（服务端未注册 tdai-memory 命名空间？）",
       overridden: "已覆盖",
       loading: "加载中…"
@@ -132,6 +133,7 @@ window.__ModuleLoader__.load({
       saved: "Saved (applies after restart)",
       saving: "Saving…",
       error: "Save failed",
+      notApplied: "Write did not take effect; check the configuration and retry",
       unavailable: "Settings namespace unavailable (tdai-memory namespace not registered server-side?)",
       overridden: "overridden",
       loading: "Loading…"
@@ -176,7 +178,6 @@ window.__ModuleLoader__.load({
     function MemorySection(props) {
       var t = props.t;
       var scope = props.scope;
-      var api = props.api;
       var [snapshot, setSnapshot] = react.useState(function () { return scope.getSnapshot(); });
       var ready = snapshot.status === "ready" && snapshot.value !== void 0;
       var [draft, setDraft] = react.useState({});
@@ -216,6 +217,7 @@ window.__ModuleLoader__.load({
       var user = snapshot.user || {};
 
       function fieldDraft(f) {
+        if (f.secret) return draft[f.key] || "";
         if (f.type === "checkbox") return draft[f.key] !== void 0 ? draft[f.key] : Boolean(getPath(value, f.path));
         return draft[f.key] !== void 0 ? draft[f.key] : String(getPath(value, f.path) ?? "");
       }
@@ -226,6 +228,7 @@ window.__ModuleLoader__.load({
       }
 
       function onSave() {
+        if (busy || !snapshot.writable) return;
         setBusy(true); setNotice(null); setError(null);
         var ops = [];
         for (var i = 0; i < FIELDS.length; i += 1) {
@@ -240,7 +243,7 @@ window.__ModuleLoader__.load({
           }
           if (f.type === "checkbox") {
             if (Boolean(d) === Boolean(current)) continue;
-            ops.push(Boolean(d) ? { op: "set", path: f.path, value: true } : { op: "unset", path: f.path });
+            ops.push({ op: "set", path: f.path, value: Boolean(d) });
             continue;
           }
           if (String(d) === String(current ?? "")) continue;
@@ -248,35 +251,27 @@ window.__ModuleLoader__.load({
           ops.push(String(d).trim() === "" ? { op: "unset", path: f.path } : { op: "set", path: f.path, value: f.type === "number" ? Number(d) : d });
         }
         if (ops.length === 0) { setBusy(false); setNotice(t("saved")); return; }
-        api.settings.mutate({
-          ns: "tdai-memory",
-          ops: ops,
-          ...snapshot.revision === void 0 ? {} : { expectedRevision: snapshot.revision }
-        }).then(function (response) {
-          setBusy(false);
-          if (!response.result.ok) {
-            var detail = response.result.error || {};
-            setError(t("error") + ": " + String(detail.message || detail.code || "unknown"));
-            return;
-          }
-          setNotice(t("saved"));
-          if (response.result.value) setDraft(Object.assign({}, valueToDraft(response.result.value)));
-        }).catch(function (e) {
-          setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
-        });
+        commit(ops);
       }
 
       function onReset() {
+        if (busy || !snapshot.writable) return;
         setBusy(true); setNotice(null); setError(null);
-        api.settings.mutate({
-          ns: "tdai-memory",
-          ops: FIELDS.map(function (f) { return { op: "unset", path: f.path }; }),
-          ...snapshot.revision === void 0 ? {} : { expectedRevision: snapshot.revision }
-        }).then(function (response) {
+        commit(FIELDS.map(function (f) { return { op: "unset", path: f.path }; }));
+      }
+
+      function commit(ops) {
+        // The form owns the transport and the recovery read. A refused Host
+        // write resolves false; it must not be displayed as a successful save.
+        Promise.resolve().then(function () {
+          return scope.mutate(ops, snapshot.revision);
+        }).then(function (ok) {
+          var next = scope.getSnapshot();
+          setSnapshot(next);
           setBusy(false);
-          if (!response.result.ok) { setError(t("error")); return; }
+          if (!ok) { setError(t("error") + ": " + t("notApplied")); return; }
           setNotice(t("saved"));
-          if (response.result.value) setDraft(Object.assign({}, valueToDraft(response.result.value)));
+          if (next.value) setDraft(valueToDraft(next.value));
         }).catch(function (e) {
           setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
         });
@@ -336,7 +331,7 @@ window.__ModuleLoader__.load({
       var out = {};
       for (var i = 0; i < FIELDS.length; i += 1) {
         var f = FIELDS[i];
-        out[f.key] = f.type === "checkbox" ? Boolean(getPath(value, f.path)) : String(getPath(value, f.path) ?? "");
+        out[f.key] = f.secret ? "" : f.type === "checkbox" ? Boolean(getPath(value, f.path)) : String(getPath(value, f.path) ?? "");
       }
       return out;
     }
@@ -346,16 +341,13 @@ window.__ModuleLoader__.load({
       var t = ctx.locale.bind(NS);
       ctx.effect(function () { return ctx.locale.register(NS, { zh: zh, en: en }); }, "dsh-tdai-memory: dictionaries");
       var scope = ctx.configForms.get("tdai-memory");
-      var api = ctx.connection.api;
-      ctx.slots.inject("settings.section", function () {
+      ctx.slots.inject("plugins.bundle.config", function () {
         return ctx.slots.register({
-          name: "settings.section",
-          id: "tdai-memory",
-          order: 26,
-          label: function () { return t("nav"); },
+          name: "plugins.bundle.config",
+          key: "dsh-tdai-memory",
           locale: NS
         }, function (props) {
-          return h(MemorySection, Object.assign({}, props, { scope: scope, api: api }));
+          return h(MemorySection, Object.assign({}, props, { scope: scope, t: t }));
         });
       });
     }

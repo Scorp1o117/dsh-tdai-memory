@@ -1,5 +1,9 @@
 # dsh-tdai-memory
 
+## 配置入口（DSH 0.2.0-rc.2 起）
+
+在首页侧边栏打开 **插件 → 已安装 → dsh-tdai-memory**，直接在插件详情页配置并保存。配置页注册到官方的 `plugins.bundle.config` 接口；全局设置页不再重复显示配置入口。Web 与桌面版使用相同界面，本版要求 DSH 0.2.0-rc.2 或更新的 0.2.x 版本。现有配置无需迁移。
+
 **GitHub**: [Scorp1o117/dsh-tdai-memory](https://github.com/Scorp1o117/dsh-tdai-memory) · **npm**: [dsh-tdai-memory](https://www.npmjs.com/package/dsh-tdai-memory) · [English](README.md)
 
 [![Enhancement Suite](https://img.shields.io/badge/part%20of-Enhancement%20Suite-3964fe)](https://github.com/Scorp1o117/dsh-enhancement-suite) [![npm](https://img.shields.io/npm/v/dsh-enhancement-suite)](https://www.npmjs.com/package/dsh-enhancement-suite)
@@ -56,7 +60,7 @@ dsh plugin --profile desktop add dsh-tdai-memory@0.3.6
 
 ## 配置（profile patch + settings）
 
-配置以 **settings 命名空间**驱动：profile patch 作为 base 层，`$DSH_HOME/settings.yaml` 的 `tdai-memory:` 节覆盖（LLM/embedding 密钥已迁到 settings.yaml）。Web UI 设置 → 记忆 可编辑全部字段（v0.2.0，含写-only 密钥）；TdaiCore 启动时构建，改动**重启后生效**。
+配置以 **settings 命名空间**驱动：profile patch 作为 base 层，`$DSH_HOME/settings.yaml` 的 `tdai-memory:` 节覆盖（LLM/embedding 密钥已迁到 settings.yaml）。首页侧边栏插件 → dsh-tdai-memory 可编辑全部字段（v0.2.0，含写-only 密钥）；TdaiCore 启动时构建，改动**重启后生效**。
 
 ```yaml
 # $DSH_HOME/settings.yaml
@@ -94,3 +98,5 @@ tdai-memory:
 - **L1 记忆向量**：随存储写入（8088 embedding 快）；L0 向量走后台任务，headless 退出时由 `destroy()` drain
 - **升级**：上游拉新代码后，在 tdai 项目目录重跑 `npx tsc -p dsh-tsconfig.json`（产物在 `dist-dsh/`）
 
+
+保存使用配置表单 API；宿主拒绝写入时保留草稿并提示错误。只修改模型不会覆盖密钥，关闭默认开启的选项会显式保存 `false`。
