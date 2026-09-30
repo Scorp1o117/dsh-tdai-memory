@@ -12,7 +12,7 @@
 
 把 **TencentDB Agent Memory**（腾讯云开源的四层记忆系统，原为 OpenClaw 插件）移植进 DeepSeek Harness。
 
-## 兼容性（v0.3.6）
+## 兼容性（v0.4.1）
 
 已在 DSH `0.1.7-rc.2`（Web）与 `0.2.0-rc.2`（桌面端运行时）的一次性 Profile 验证。桌面端使用独立的 `desktop` Profile；其他预发布版本暂未验证。
 
@@ -96,6 +96,7 @@ tdai-memory:
 - **提取模型**：`mimo-v2.5` 提取正确但单次 20-30s（后台执行，不阻塞对话）；`deepseek-v4-flash` 快但 JSON 输出不合规（提取 0 条）
 - **dedup**：LLM 冲突检测输出解析不稳（曾导致 stored=0），默认关闭；开启需换更稳的模型
 - **L1 记忆向量**：随存储写入（8088 embedding 快）；L0 向量走后台任务，headless 退出时由 `destroy()` drain
+- **搜索工具**（`toolsEnabled`，默认开启）：开关在插件页，切换后**原地生效**（行配置是 `volatile`，无需重启即重新注册）。若两个工具完全缺失，可查插件日志 `[tdai-memory] tools registered: …`（v0.4.1 起）；v0.4.1 之前它读的是 cordis 交给 `apply` 的 Volatile 包装对象上的 `config.toolsEnabled` —— 那个属性永远不存在，因此整个失败过程完全静默（issue #3）
 - **升级**：上游拉新代码后，在 tdai 项目目录重跑 `npx tsc -p dsh-tsconfig.json`（产物在 `dist-dsh/`）
 
 

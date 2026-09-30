@@ -15,7 +15,7 @@ Part of the [DeepSeek Harness Enhancement Suite](https://github.com/Scorp1o117/d
 A port of **TencentDB Agent Memory** (Tencent Cloud's open-source four-layer
 memory system, originally an OpenClaw plugin) into DeepSeek Harness.
 
-## Compatibility (v0.3.6)
+## Compatibility (v0.4.1)
 
 Verified with DSH `0.1.7-rc.2` (Web) and `0.2.0-rc.2` (Desktop runtime) in isolated profiles. The Desktop app uses its own `desktop` profile. Other DSH prereleases remain unverified.
 
@@ -140,6 +140,14 @@ not need it. Users who select the local backend should install and approve
   stored=0); off by default; enable only with a more reliable model
 - **L1 memory vectors**: written with storage (8088 embedding is fast); L0
   vectors run as a background task, drained by `destroy()` on headless exit
+- **Search tools** (`toolsEnabled`, on by default): the switch lives in the
+  Plugins page and applies in place — the row config is `volatile`, so the
+  plugin re-syncs its registration without a restart. If both tools are
+  missing, look for the plugin's
+  `[tdai-memory] tools registered: tdai_memory_search, tdai_conversation_search`
+  log line (v0.4.1+). Before v0.4.1 it read `config.toolsEnabled` off the
+  Volatile wrapper cordis hands to `apply` — a property that never exists — so
+  the failure was completely silent (issue #3)
 - **Upgrades**: after pulling new upstream code, rerun
   `npx tsc -p dsh-tsconfig.json` in the tdai project dir (output in `dist-dsh/`)
 

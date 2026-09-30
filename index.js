@@ -106,18 +106,31 @@ function extractText(content) {
     .trim();
 }
 
+/**
+ * Resolve the config value handed to `apply`.
+ *
+ * The row schema ends in `.volatile()` (hot-reloadable config). Config
+ * validation runs through the standard-schema path, which returns the
+ * validated object wrapped in a cosmokit `Volatile`: a frozen `{ get() }`
+ * reference whose OWN properties are always `undefined`. Reading
+ * `config.toolsEnabled` off it can therefore never be true — the tools guard
+ * did exactly that and silently stopped registering the search tools in
+ * v0.3.4 (issue #3). Read config through this helper only.
+ *
+ * The wrapper is a live reference (`updateVolatile` swaps its inner value), so
+ * calling this at use time — not once at startup — sees volatile edits.
+ */
+function runtimeConfigOf(config) {
+  return typeof config?.get === "function" ? config.get() : config;
+}
+
 function apply(ctx, config) {
   // ── build-once state (rebuildable) ───────────────────────────────────────
-  // TdaiCore is built from the RESOLVED settings value (composition entry as
-  // base, `tdai-memory` settings section / settings.yaml as user layer), so
-  // keys stored in settings.yaml (llm.apiKey etc.) are honored. The settings
-  // inject callback that drives `installSettingsSection`'s setSource is
-  // scheduled by cordis as a plugin start — it ALWAYS runs after any 0ms
-  // timer — so the no-settings fallback below cannot be allowed to win the
-  // race. Instead of racing, we let the fallback build from the entry config
-  // first (guaranteeing a working core even without settings), and REBUILD
-  // from the resolved settings when the settings mount arrives. The fallback
-  // is a one-shot; the settings build always wins afterwards.
+  // TdaiCore is built once from the resolved row config: the composition entry
+  // as base with the Plugins-page values merged in by the host (settings.yaml is
+  // no longer a config source since v0.4.0 — see client.js `configForms`). The
+  // build is deferred past the 0ms window so web/headless boots are never
+  // blocked on TdaiCore's stores and embedding client.
   let core = null;
   let tdaiConfig = null;
   let dataDir = "";
@@ -339,69 +352,137 @@ function apply(ctx, config) {
   }
 
   // ── tools ────────────────────────────────────────────────────────────────
-  if (config.toolsEnabled) {
-    ctx.tools.register(defineTool({
-      name: "tdai_memory_search",
-      description:
-        "Search structured long-term memories (facts, preferences, and experiences extracted from past conversations). " +
-        "Use this to recall what the user told you or what happened in earlier sessions.",
-      parameters: {
-        query: { type: "string", required: true, description: "The memory to search for." },
-        limit: { type: "integer", description: "Maximum results (default 5)." },
-      },
-      output: {
-        schema: { type: "string" },
-        render: (_args, value) => [{ type: "text", text: value }],
-      },
-      async execute(args) {
-        const result = await core.searchMemories({ query: args.query, limit: args.limit ?? 5 });
-        return result.text;
-      },
-    }));
-    ctx.tools.register(defineTool({
-      name: "tdai_conversation_search",
-      description:
-        "Search raw past conversation logs (L0) by keyword. Use this to look up exact quotes or details " +
-        "that structured memory search does not cover.",
-      parameters: {
-        query: { type: "string", required: true, description: "Text to find in past conversations." },
-        limit: { type: "integer", description: "Maximum results (default 5)." },
-      },
-      output: {
-        schema: { type: "string" },
-        render: (_args, value) => [{ type: "text", text: value }],
-      },
-      async execute(args) {
-        const result = await core.searchConversations({ query: args.query, limit: args.limit ?? 5 });
-        return result.text;
-      },
-    }));
+  // `toolsEnabled` defaults to true (schema `.default(true)`), so only an
+  // explicit `false` turns the two search tools off. Read through
+  // `runtimeConfigOf` — the volatile row config has no plain properties (#3).
+  let toolsRegistered = false;
+  let toolsDeferred = false;
+  let toolsDisposers = [];
+
+  /** The core, or a clear error while the first build is still in flight. */
+  function requireCore() {
+    if (!core) throw new Error("tdai-memory is still initializing; retry this call in a moment");
+    return core;
   }
 
-  // ── settings-backed configuration ─────────────────────────────────────────
-  // The composition entry stays the base layer; a registered `tdai-memory`
-  // settings section overlays it (settings.yaml). The source is a GETTER
-  // (`() => scope.get()`), not the config object — we must call it to obtain
-  // the resolved settings. The settings mount (cordis inject) always arrives
-  // after our fallback timer, so the fallback builds the core from the entry
-  // config first (one-shot) and the settings build REBUILDS the core with the
-  // resolved values (apiKey included).
-  // Compat shim: dsh-settings 0.1.2-rc.1 removed the module-level
-  // `installSettingsSection` export (the provider now lives at ctx.settings).
-  // Inline the same logic via ctx.inject(["settings"]) — works on both
-  // 0.1.1 (module export wrapper) and 0.1.2 (ctx.settings) hosts.
+  function registerTools(tools) {
+    if (toolsRegistered) return;
+    if (typeof tools?.register !== "function") {
+      ctx.logger.warn("[tdai-memory] tools service does not expose register(); search tools stay unavailable");
+      return;
+    }
+    toolsRegistered = true;
+    toolsDisposers = [
+      tools.register(defineTool({
+        name: "tdai_memory_search",
+        description:
+          "Search structured long-term memories (facts, preferences, and experiences extracted from past conversations). " +
+          "Use this to recall what the user told you or what happened in earlier sessions.",
+        parameters: {
+          query: { type: "string", required: true, description: "The memory to search for." },
+          limit: { type: "integer", description: "Maximum results (default 5)." },
+        },
+        output: {
+          schema: { type: "string" },
+          render: (_args, value) => [{ type: "text", text: value }],
+        },
+        async execute(args) {
+          const result = await requireCore().searchMemories({ query: args.query, limit: args.limit ?? 5 });
+          return result.text;
+        },
+      })),
+      tools.register(defineTool({
+        name: "tdai_conversation_search",
+        description:
+          "Search raw past conversation logs (L0) by keyword. Use this to look up exact quotes or details " +
+          "that structured memory search does not cover.",
+        parameters: {
+          query: { type: "string", required: true, description: "Text to find in past conversations." },
+          limit: { type: "integer", description: "Maximum results (default 5)." },
+        },
+        output: {
+          schema: { type: "string" },
+          render: (_args, value) => [{ type: "text", text: value }],
+        },
+        async execute(args) {
+          const result = await requireCore().searchConversations({ query: args.query, limit: args.limit ?? 5 });
+          return result.text;
+        },
+      })),
+    ];
+    ctx.logger.info("[tdai-memory] tools registered: tdai_memory_search, tdai_conversation_search");
+  }
+
+  function unregisterTools() {
+    for (const dispose of toolsDisposers.splice(0)) {
+      try {
+        dispose();
+      } catch (error) {
+        ctx.logger.warn(`[tdai-memory] tool dispose failed: ${String(error)}`);
+      }
+    }
+    toolsRegistered = false;
+    ctx.logger.info("[tdai-memory] tools unregistered (toolsEnabled=false)");
+  }
+
+  /** Align tool registration with the live `toolsEnabled` value. */
+  function syncTools() {
+    if (runtimeConfigOf(config)?.toolsEnabled === false) {
+      if (toolsRegistered) unregisterTools();
+      return;
+    }
+    if (toolsRegistered || toolsDeferred) return;
+    // `tools` is in this plugin's `inject`, so the service is normally live
+    // here; `ctx.inject` is the fallback for hosts that mount it later. The old
+    // one-shot `ctx.tools` property read registered nothing and said nothing.
+    const tools = ctx.tools ?? ctx.get?.("tools");
+    if (tools === undefined) {
+      toolsDeferred = true;
+      ctx.logger.warn("[tdai-memory] tools service not ready; deferring search-tool registration");
+      ctx.inject(["tools"], (toolCtx) => {
+        toolsDeferred = false;
+        const deferred = toolCtx.tools ?? toolCtx.get?.("tools");
+        if (deferred === undefined) {
+          ctx.logger.warn("[tdai-memory] tools service still unavailable; search tools stay unavailable");
+          return;
+        }
+        registerTools(deferred);
+      });
+      return;
+    }
+    registerTools(tools);
+  }
+
+  // `toolsEnabled` is a volatile config path, so flipping it (Plugins page)
+  // updates the running fiber in place instead of remounting this plugin: the
+  // loader reports that as `loader/volatile-update`, and this keeps the
+  // registration in sync with the new value.
+  ctx.on("loader/volatile-update", () => {
+    try {
+      syncTools();
+    } catch (error) {
+      ctx.logger.warn(`[tdai-memory] tool sync failed: ${String(error)}`);
+    }
+  });
+
+  syncTools();
+
+  // ── configuration changes ─────────────────────────────────────────────────
+  // Configuration lives in the Plugins page (client.js → configForms), i.e. in
+  // this row's own config. Because the row schema is `.volatile()`, an edit is
+  // applied to the running fiber in place — the loader reports it as
+  // `loader/volatile-update` (the tools above re-sync on it) — while TdaiCore
+  // is built at startup, so an edit that must reach the core needs a plugin
+  // reload. Legacy settings documents are only reported here.
   ctx.on("settings/document-updated", (id) => {
     if (id === NS) ctx.logger.warn("[tdai-memory] settings updated; restart to apply (TdaiCore is built at startup)");
   });
 
-  // Fallback when no settings service ever mounts: build from the entry
-  // config. One-shot — if the settings mount arrives later, its build
-  // supersedes this one. Delayed past the 0ms window so headless/web boots
-  // are never blocked on this timer.
+  // Deferred first build (see the note at the top of apply).
   setTimeout(() => {
     if (!builtOnce) {
       builtOnce = true;
-      void build(typeof config.get === "function" ? config.get() : config);
+      void build(runtimeConfigOf(config));
     }
   }, 500);
 
