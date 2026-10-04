@@ -57,6 +57,12 @@ The data directory reuses the existing `~/.memory-tencentdb/memory-tdai`, so
 | dsh shell | `index.js`: config mapping, `session/event` + `session/flush` capture, `system-prompt/assemble` recall injection on `agent.ctx`, tool registration, lifecycle |
 | Fallback | `recall-inject.js`: preset-row recall injection (used when mounted inside an agent preset) |
 
+Recall caches expire after 30 seconds and retain at most 128 sessions per
+injection instance. Failed or timed-out recalls are retried on the next assembly.
+The preset row also accepts `timeoutMs` (default 4000); reaching this deadline
+continues prompt assembly without memory context. Deadline timers are cleared
+when recall settles early. Underlying recall work may continue after the deadline.
+
 Hard-won wiring details:
 
 - **Capture**: `session/flush` listener (await semantics; must complete before

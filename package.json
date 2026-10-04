@@ -40,6 +40,7 @@
     "files": [
         "index.js",
         "recall-inject.js",
+        "recall-runtime.js",
         "client.js",
         "cordis.patch.yml",
         "vendor",
@@ -92,6 +93,6 @@
         }
     },
     "scripts": {
-        "test": "node tests/settings-scope-compat.test.mjs && node tests/install-contract.test.mjs && node --test tests/plugin-page.test.mjs tests/client-write-flow.test.mjs tests/tools-registration.test.mjs"
+        "test": "node tests/settings-scope-compat.test.mjs && node tests/install-contract.test.mjs && node --test tests/plugin-page.test.mjs tests/client-write-flow.test.mjs tests/tools-registration.test.mjs tests/recall-runtime.test.mjs"
     }
 }

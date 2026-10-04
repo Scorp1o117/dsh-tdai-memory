@@ -24,6 +24,7 @@ import { defineTool } from "@deepseek-ai/dsh-tools";
 import { TdaiCore } from "./vendor/tdai/core/tdai-core.js";
 import { parseConfig } from "./vendor/tdai/config.js";
 import { StandaloneHostAdapter } from "./vendor/tdai/adapters/standalone/host-adapter.js";
+import { createRecallCache, recallWithTimeout } from "./recall-runtime.js";
 
 /** Cordis plugin name. */
 const name = "tdai-memory";
@@ -145,8 +146,7 @@ function apply(ctx, config) {
   /** session keys seen this process (for final L1 flush on teardown). */
   const seenSessions = new Set();
   /** recall cache per session: same user text within TTL reuses the result. */
-  const recallCache = new Map();
-  const RECALL_CACHE_TTL_MS = 30_000;
+  const recallCache = createRecallCache();
 
   // One-shot mode (dsh --profile headless): the process exits right after
   // flush, so L1 must finish inside the flush listener. In web mode the
@@ -231,6 +231,7 @@ function apply(ctx, config) {
     // new core; initialize() only sets up stores/pipeline.
     tdaiConfig = nextConfig;
     core = nextCore;
+    recallCache.clear();
     await nextCore.initialize();
     const key = nextConfig.llm.apiKey || "";
     log("info", `initialized (dataDir=${dataDir}, llm=${nextConfig.llm.model}, apiKey=${key ? `${key.slice(0, 6)}…` : "<empty>"}, embedding=${nextConfig.embedding.model})`);
@@ -321,16 +322,15 @@ function apply(ctx, config) {
             if (!lastUser) return assembly;
             const text = extractText(lastUser.content);
             if (!text) return assembly;
-            const now = Date.now();
-            const cached = recallCache.get(session.id);
-            if (cached && cached.text === text && now - cached.ts < RECALL_CACHE_TTL_MS) {
-              return injectRecall(assembly, cached.result);
+            const cached = recallCache.get(session.id, text);
+            if (cached !== undefined) {
+              return injectRecall(assembly, cached);
             }
-            const result = await Promise.race([
-              core.handleBeforeRecall(text, session.id),
-              new Promise((resolve) => setTimeout(() => resolve(null), tdaiConfig.recall.timeoutMs + 1000)),
-            ]).catch(() => null);
-            recallCache.set(session.id, { text, result: result ?? {}, ts: now });
+            const recallCore = core;
+            const result = await recallWithTimeout(
+              () => recallCore.handleBeforeRecall(text, session.id), tdaiConfig.recall.timeoutMs + 1000,
+            );
+            if (core === recallCore) recallCache.set(session.id, text, result);
             return injectRecall(assembly, result ?? {});
           } catch (error) {
             ctx.logger.warn(`[tdai-memory] recall failed: ${String(error)}`);

@@ -52,6 +52,11 @@ dsh plugin --profile desktop add dsh-tdai-memory@0.3.6
 | dsh 壳 | `index.js`：配置映射、`session/event`+`session/flush` 捕获、`agent.ctx` 上的 `system-prompt/assemble` waterfall 召回注入、工具注册、生命周期 |
 | 备用 | `recall-inject.js`：preset 行形态的召回注入（挂在 agent preset 内时用） |
 
+召回缓存默认 30 秒过期，每个注入实例最多保留 128 个会话。失败或超时的召回
+会在下次组装时重试。preset 行还支持 `timeoutMs`（默认 4000），到达期限后
+不注入记忆并继续组装提示词；提前完成时会清除超时定时器。期限到达后，底层
+召回任务可能仍会继续运行。
+
 关键接线（都是踩坑换来的）：
 
 - **捕获**：`session/flush` 监听器（await 语义，headless 退出前必完成）；`turn/start` 时间戳做 L0 cursor 下限；turn id 去重
