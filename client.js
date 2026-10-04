@@ -224,6 +224,7 @@ window.__ModuleLoader__.load({
     }
 
     function MemorySection(props) {
+      useLocale(props.locale);
       var t = props.t;
       var scope = props.scope;
       var [snapshot, setSnapshot] = react.useState(function () { return scope.getSnapshot(); });
@@ -316,7 +317,7 @@ window.__ModuleLoader__.load({
           if (String(d).trim() === "" && getPath(user, f.path) === void 0) continue;
           ops.push(String(d).trim() === "" ? { op: "unset", path: f.path } : { op: "set", path: f.path, value: f.type === "number" ? Number(d) : d });
         }
-        if (ops.length === 0) { setBusy(false); setNotice(t("saved")); return; }
+        if (ops.length === 0) { setBusy(false); setNotice({ key: "saved" }); return; }
         commit(ops);
       }
 
@@ -335,11 +336,11 @@ window.__ModuleLoader__.load({
           var next = scope.getSnapshot();
           setSnapshot(next);
           setBusy(false);
-          if (!ok) { setError(t("error") + ": " + t("notApplied")); return; }
-          setNotice(t("saved"));
+          if (!ok) { setError({ key: "error", detailKey: "notApplied" }); return; }
+          setNotice({ key: "saved" });
           if (next.value) setDraft({});
         }).catch(function (e) {
-          setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
+          setBusy(false); setError({ key: "error", detail: String(e && e.message || e) });
         });
       }
 
@@ -399,14 +400,29 @@ window.__ModuleLoader__.load({
         h("div", { className: "__tm_actions" },
           h("button", { type: "button", className: "__tm_btn __tm_btnPrimary", onClick: onSave, disabled: busy || !snapshot.writable }, t("save")),
           h("button", { type: "button", className: "__tm_btn", onClick: onReset, disabled: busy || !snapshot.writable }, t("reset")),
-          notice ? h("span", { className: "__tm_status" }, notice) : null,
+          notice ? h("span", { className: "__tm_status" }, messageText(t, notice)) : null,
           busy ? h("span", { className: "__tm_status" }, t("saving")) : null,
-          error ? h("span", { className: "__tm_error" }, error) : null
+          error ? h("span", { className: "__tm_error" }, messageText(t, error)) : null
         )
       );
     }
 
     // ── plugin ────────────────────────────────────────────────────────────
+
+    // Follow the host language without remounting the form or losing drafts.
+    function useLocale(locale) {
+      var refresh = react.useState(0)[1];
+      react.useEffect(function () {
+        if (!locale || typeof locale.subscribe !== "function") return;
+        return locale.subscribe(function () { refresh(function (revision) { return revision + 1; }); });
+      }, [locale]);
+    }
+    // Keep translation keys in state so feedback follows later language changes.
+    function messageText(t, message) {
+      if (!message) return "";
+      return t(message.key) + (message.detailKey ? ": " + t(message.detailKey) : message.detail ? ": " + message.detail : "");
+    }
+
     function apply(ctx) {
       var t = ctx.locale.bind(NS);
       ctx.effect(function () { return ctx.locale.register(NS, { zh: zh, en: en }); }, "dsh-tdai-memory: dictionaries");
@@ -417,7 +433,7 @@ window.__ModuleLoader__.load({
           key: "dsh-tdai-memory",
           locale: NS
         }, function (props) {
-          return h(MemorySection, Object.assign({}, props, { scope: scope, t: t }));
+          return h(MemorySection, Object.assign({}, props, { scope: scope, t: t, locale: ctx.locale }));
         });
       });
     }
