@@ -4,6 +4,8 @@
 
 Open **Plugins → Installed → dsh-tdai-memory** from the homepage sidebar to configure and save this plugin. The page uses the official `plugins.bundle.config` interface, without a duplicate entry in global Settings. Web and Desktop share the page. This version requires DSH 0.2.0-rc.2 or a later 0.2.x host; existing configuration is retained.
 
+Choose **Automatic memory** for capture, extraction, recall and search together; **Search existing memory only** disables capture, extraction and automatic recall while keeping search tools; **Pause memory features** disables all four. The main page contains the two model connections. Individual switches, storage paths and tuning remain under **Advanced**. Existing mixed switch values appear as **Custom combination** and are preserved. Select a mode, Save, then restart DSH for pipeline changes (the search-tool switch applies immediately). Only edited fields are written; blank keys and untouched advanced options remain unchanged.
+
 [![中文文档](https://img.shields.io/badge/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3-blue)](README.zh.md)
 
 **GitHub**: [Scorp1o117/dsh-tdai-memory](https://github.com/Scorp1o117/dsh-tdai-memory) · **npm**: [dsh-tdai-memory](https://www.npmjs.com/package/dsh-tdai-memory)

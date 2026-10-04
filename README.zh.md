@@ -4,6 +4,8 @@
 
 在首页侧边栏打开 **插件 → 已安装 → dsh-tdai-memory**，直接在插件详情页配置并保存。配置页注册到官方的 `plugins.bundle.config` 接口；全局设置页不再重复显示配置入口。Web 与桌面版使用相同界面，本版要求 DSH 0.2.0-rc.2 或更新的 0.2.x 版本。现有配置无需迁移。
 
+选择 **自动记忆**，一次开启捕获、提取、召回和搜索；**仅搜索已有记忆** 关闭捕获、提取和自动召回，保留搜索工具；**暂停记忆功能** 关闭全部四项。主页面只展示两个模型的连接信息，独立开关、存储路径和调优参数保留在 **高级设置** 中。已有开关组合显示为 **自定义组合**，不会自动覆盖。选择模式后保存，并重启 DSH 使记忆流水线设置生效（搜索工具开关即时生效）。只写入编辑过的字段，密钥留空及未编辑的高级设置保持原值。
+
 **GitHub**: [Scorp1o117/dsh-tdai-memory](https://github.com/Scorp1o117/dsh-tdai-memory) · **npm**: [dsh-tdai-memory](https://www.npmjs.com/package/dsh-tdai-memory) · [English](README.md)
 
 [![Enhancement Suite](https://img.shields.io/badge/part%20of-Enhancement%20Suite-3964fe)](https://github.com/Scorp1o117/dsh-enhancement-suite) [![npm](https://img.shields.io/npm/v/dsh-enhancement-suite)](https://www.npmjs.com/package/dsh-enhancement-suite)

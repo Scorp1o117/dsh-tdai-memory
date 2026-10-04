@@ -50,10 +50,18 @@ window.__ModuleLoader__.load({
     var inject = ["slots", "locale", "configForms"];
     var zh = {
       nav: "记忆",
-      intro: "TDAI 记忆配置：L0 捕获 → L1 结构化提取 → 召回注入。密钥只写不读。TdaiCore 在启动时构建，修改后需重启生效。",
+      mode: "记忆模式",
+      modeAuto: "自动记忆（推荐）",
+      modeSearch: "仅搜索已有记忆",
+      modePaused: "暂停记忆功能",
+      modeCustom: "自定义组合",
+      modeHint: "自动：捕获、提取、召回和搜索全部开启；仅搜索：不记录新对话、不自动注入记忆；暂停：四项全部关闭。选择后点击保存。",
+      advanced: "高级设置：独立开关、存储与请求参数",
+      setupHint: "填写提取模型和向量模型的连接信息，再保存。已有自定义设置会保留；密钥留空不修改。",
+      intro: "记录对话、整理长期记忆，并在相关对话中自动召回。保存后请重启 DSH 生效；密钥只写不读。",
       groupData: "数据",
-      groupLlm: "提取 LLM（L1/L2/L3）",
-      groupEmbedding: "向量 Embedding",
+      groupLlm: "记忆整理模型",
+      groupEmbedding: "向量检索模型",
       groupCapture: "捕获",
       groupExtraction: "提取",
       groupRecall: "召回",
@@ -95,10 +103,18 @@ window.__ModuleLoader__.load({
     };
     var en = {
       nav: "Memory",
-      intro: "TDAI memory config: L0 capture → L1 extraction → recall injection. Keys are write-only. TdaiCore is built at startup; changes apply after a restart.",
+      mode: "Memory mode",
+      modeAuto: "Automatic memory (recommended)",
+      modeSearch: "Search existing memory only",
+      modePaused: "Pause memory features",
+      modeCustom: "Custom combination",
+      modeHint: "Automatic enables capture, extraction, recall and search. Search only records no new conversations and injects no memory. Pause disables all four. Click Save to apply your selection.",
+      advanced: "Advanced: individual switches, storage and request options",
+      setupHint: "Enter the extraction and embedding connections, then save. Existing custom settings are preserved; blank keys stay unchanged.",
+      intro: "Record conversations, organize long-term memory and recall it in relevant chats. Restart DSH after saving to apply changes; keys are write-only.",
       groupData: "Data",
-      groupLlm: "Extraction LLM (L1/L2/L3)",
-      groupEmbedding: "Embeddings",
+      groupLlm: "Memory extraction model",
+      groupEmbedding: "Memory search embeddings",
       groupCapture: "Capture",
       groupExtraction: "Extraction",
       groupRecall: "Recall",
@@ -165,6 +181,9 @@ window.__ModuleLoader__.load({
       { path: ["toolsEnabled"], label: "fieldToolsEnabled", type: "checkbox", group: "groupTools" }
     ];
     FIELDS.forEach(function (f) { f.key = f.path.join("."); });
+    var BASIC_KEYS = ["llm.baseUrl", "llm.apiKey", "llm.model", "embedding.baseUrl", "embedding.apiKey", "embedding.model"];
+    var MODE_KEYS = ["captureEnabled", "extraction.enabled", "recall.enabled", "toolsEnabled"];
+    var MODES = { auto: [true, true, true, true], search: [false, false, false, true], paused: [false, false, false, false] };
 
     function getPath(obj, path) {
       var cur = obj;
@@ -204,7 +223,7 @@ window.__ModuleLoader__.load({
       // call, so depending on snapshot.value would reset user input on every
       // render (typing appears dead).
       react.useEffect(function () {
-        if (ready) setDraft(Object.assign({}, valueToDraft(snapshot.value)));
+        if (ready) setDraft({});
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [ready]);
 
@@ -226,6 +245,23 @@ window.__ModuleLoader__.load({
         setNotice(null);
         setError(null);
       }
+      function memoryMode() {
+        var flags = MODE_KEYS.map(function (key) {
+          return Object.prototype.hasOwnProperty.call(draft, key) ? draft[key] : getPath(value, key.split(".")) !== false;
+        });
+        return Object.keys(MODES).find(function (mode) {
+          return MODES[mode].every(function (flag, i) { return flag === flags[i]; });
+        }) || "custom";
+      }
+      function setMode(mode) {
+        if (!MODES[mode] || busy || !snapshot.writable) return;
+        setDraft(function (prev) {
+          var next = Object.assign({}, prev);
+          MODE_KEYS.forEach(function (key, i) { next[key] = MODES[mode][i]; });
+          return next;
+        });
+        setNotice(null); setError(null);
+      }
 
       function onSave() {
         if (busy || !snapshot.writable) return;
@@ -233,6 +269,7 @@ window.__ModuleLoader__.load({
         var ops = [];
         for (var i = 0; i < FIELDS.length; i += 1) {
           var f = FIELDS[i];
+          if (!Object.prototype.hasOwnProperty.call(draft, f.key)) continue;
           var d = fieldDraft(f);
           var current = getPath(value, f.path);
           if (f.type === "password") {
@@ -271,34 +308,36 @@ window.__ModuleLoader__.load({
           setBusy(false);
           if (!ok) { setError(t("error") + ": " + t("notApplied")); return; }
           setNotice(t("saved"));
-          if (next.value) setDraft(valueToDraft(next.value));
+          if (next.value) setDraft({});
         }).catch(function (e) {
           setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
         });
       }
 
-      var nodes = [];
-      var lastGroup = null;
+      var nodes = [], advancedNodes = [];
+      var lastGroups = { basic: null, advanced: null };
       // forEach callback gives each handler its own `f` — a `for (var i)`
       // loop would share one `f` across every onChange closure, so typing
       // updated the LAST field's draft and the input appeared dead.
       FIELDS.forEach(function (f) {
-        if (f.group !== lastGroup) {
-          lastGroup = f.group;
-          nodes.push(h("div", { key: "g" + f.group, className: "__tm_group" }, t(f.group)));
+        var section = BASIC_KEYS.indexOf(f.key) !== -1 ? "basic" : "advanced";
+        var target = section === "basic" ? nodes : advancedNodes;
+        if (f.group !== lastGroups[section]) {
+          lastGroups[section] = f.group;
+          target.push(h("div", { key: "g" + f.group, className: "__tm_group" }, t(f.group)));
         }
         var overridden = getPath(user, f.path) !== void 0;
         if (f.type === "checkbox") {
-          nodes.push(h("label", { key: f.path.join("."), className: "__tm_field" },
+          target.push(h("label", { key: f.path.join("."), className: "__tm_field" },
             h("span", { className: "__tm_row" },
-              h("input", { className: "__tm_check", type: "checkbox", checked: Boolean(fieldDraft(f)), onChange: function (e) { setField(f, e.target.checked); } }),
+              h("input", { className: "__tm_check", type: "checkbox", disabled: busy || !snapshot.writable, checked: Boolean(fieldDraft(f)), onChange: function (e) { setField(f, e.target.checked); } }),
               h("span", { className: "__tm_label" }, t(f.label)),
               overridden ? h("span", { className: "__tm_override" }, t("overridden")) : null
             )
           ));
           return;
         }
-        nodes.push(h("label", { key: f.path.join("."), className: "__tm_field" },
+        target.push(h("label", { key: f.path.join("."), className: "__tm_field" },
           h("span", { className: "__tm_label" },
             t(f.label),
             overridden ? h("span", { className: "__tm_override" }, t("overridden")) : null
@@ -307,6 +346,7 @@ window.__ModuleLoader__.load({
             className: "__tm_input",
             type: f.type === "password" ? "password" : f.type === "number" ? "number" : "text",
             value: fieldDraft(f),
+            disabled: busy || !snapshot.writable,
             placeholder: f.type === "password" ? (overridden ? "••••••••" : t("secretHint")) : "",
             onChange: function (e) { setField(f, e.target.value); }
           }),
@@ -316,7 +356,17 @@ window.__ModuleLoader__.load({
 
       return h("div", { className: "__tm_root" },
         h("p", { className: "__tm_hint", style: { margin: "0 0 4px" } }, t("intro")),
+        h("label", { className: "__tm_field" },
+          h("span", { className: "__tm_label" }, t("mode")),
+          h("select", { className: "__tm_input", "aria-label": t("mode"), value: memoryMode(), disabled: busy || !snapshot.writable,
+            onChange: function (e) { setMode(e.target.value); } },
+            h("option", { value: "auto" }, t("modeAuto")), h("option", { value: "search" }, t("modeSearch")),
+            h("option", { value: "paused" }, t("modePaused")), h("option", { value: "custom", disabled: true }, t("modeCustom"))),
+          h("span", { className: "__tm_hint" }, t("modeHint"))),
+        h("p", { className: "__tm_hint" }, t("setupHint")),
         nodes,
+        h("details", null, h("summary", { style: { cursor: "pointer" } }, t("advanced")),
+          h("div", { style: { display: "flex", flexDirection: "column", gap: 10, paddingTop: 12 } }, advancedNodes)),
         h("div", { className: "__tm_actions" },
           h("button", { type: "button", className: "__tm_btn __tm_btnPrimary", onClick: onSave, disabled: busy || !snapshot.writable }, t("save")),
           h("button", { type: "button", className: "__tm_btn", onClick: onReset, disabled: busy || !snapshot.writable }, t("reset")),
@@ -325,15 +375,6 @@ window.__ModuleLoader__.load({
           error ? h("span", { className: "__tm_error" }, error) : null
         )
       );
-    }
-
-    function valueToDraft(value) {
-      var out = {};
-      for (var i = 0; i < FIELDS.length; i += 1) {
-        var f = FIELDS[i];
-        out[f.key] = f.secret ? "" : f.type === "checkbox" ? Boolean(getPath(value, f.path)) : String(getPath(value, f.path) ?? "");
-      }
-      return out;
     }
 
     // ── plugin ────────────────────────────────────────────────────────────
