@@ -11,10 +11,11 @@
  *   - tdai:recall  — relevant L1 memories for the current user message
  *   - tdai:profile — stable persona / scene navigation context
  *
- * The recall call is bounded by `recall.timeoutMs`; failures degrade to no
+ * The recall call is bounded by this row's `timeoutMs`; failures degrade to no
  * injection and never break the assembly.
  */
 import z from "@deepseek-ai/schemastery";
+import { createRecallCache, recallWithTimeout } from "./recall-runtime.js";
 
 /** Cordis plugin name. */
 const name = "tdai-recall-inject";
@@ -27,10 +28,12 @@ const Config = z.object({
   minUserTextChars: z.number().default(1),
   /** Per-session cache TTL for identical user text (ms). */
   cacheTtlMs: z.number().default(30_000),
+  /** Assembly deadline even when the memory service does not settle. */
+  timeoutMs: z.number().default(4000),
 });
 
 function apply(ctx, config) {
-  const cache = new Map();
+  const cache = createRecallCache(config.cacheTtlMs ?? 30_000);
 
   ctx.on("system-prompt/assemble", async (assembly, context) => {
     try {
@@ -49,15 +52,14 @@ function apply(ctx, config) {
       const text = extractText(lastUser.content);
       if (!text || text.length < config.minUserTextChars) return assembly;
 
-      const now = Date.now();
-      const cached = cache.get(session.id);
-      if (cached && cached.text === text && now - cached.ts < config.cacheTtlMs) {
-        return injectRecall(assembly, cached.result);
+      const cached = cache.get(session.id, text);
+      if (cached !== undefined) {
+        return injectRecall(assembly, cached);
       }
-      const result = await ctx.tdaiMemory
-        .handleBeforeRecall(text, session.id)
-        .catch(() => null);
-      cache.set(session.id, { text, result: result ?? {}, ts: now });
+      const result = await recallWithTimeout(
+        () => ctx.tdaiMemory.handleBeforeRecall(text, session.id), config.timeoutMs,
+      );
+      cache.set(session.id, text, result);
       return injectRecall(assembly, result ?? {});
     } catch {
       return assembly;

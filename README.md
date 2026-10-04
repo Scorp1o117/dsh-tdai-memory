@@ -1,8 +1,12 @@
 # dsh-tdai-memory
 
+The plugin follows the DSH language setting (Chinese and English in DSH 0.2.0-rc.2), including configuration, status messages and plugin-list metadata. Language-pack locales use the host fallback chain. Switching languages preserves unsaved settings; there is no separate plugin language selector.
+
 ## Configuration page (DSH 0.2.0-rc.2 and later)
 
 Open **Plugins → Installed → dsh-tdai-memory** from the homepage sidebar to configure and save this plugin. The page uses the official `plugins.bundle.config` interface, without a duplicate entry in global Settings. Web and Desktop share the page. This version requires DSH 0.2.0-rc.2 or a later 0.2.x host; existing configuration is retained.
+
+Choose **Automatic memory** for capture, extraction, recall and search together; **Search existing memory only** disables capture, extraction and automatic recall while keeping search tools; **Pause memory features** disables all four. The main page contains the two model connections. Individual switches, storage paths and tuning remain under **Advanced**. Existing mixed switch values appear as **Custom combination** and are preserved. Select a mode, Save, then restart DSH for pipeline changes (the search-tool switch applies immediately). Only edited fields are written; blank keys and untouched advanced options remain unchanged.
 
 [![中文文档](https://img.shields.io/badge/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3-blue)](README.zh.md)
 
@@ -56,6 +60,12 @@ The data directory reuses the existing `~/.memory-tencentdb/memory-tdai`, so
 | Host adapter | `StandaloneHostAdapter` (official standalone mode, direct OpenAI-compatible calls) |
 | dsh shell | `index.js`: config mapping, `session/event` + `session/flush` capture, `system-prompt/assemble` recall injection on `agent.ctx`, tool registration, lifecycle |
 | Fallback | `recall-inject.js`: preset-row recall injection (used when mounted inside an agent preset) |
+
+Recall caches expire after 30 seconds and retain at most 128 sessions per
+injection instance. Failed or timed-out recalls are retried on the next assembly.
+The preset row also accepts `timeoutMs` (default 4000); reaching this deadline
+continues prompt assembly without memory context. Deadline timers are cleared
+when recall settles early. Underlying recall work may continue after the deadline.
 
 Hard-won wiring details:
 

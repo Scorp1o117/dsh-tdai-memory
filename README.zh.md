@@ -1,8 +1,12 @@
 # dsh-tdai-memory
 
+插件跟随 DSH 的语言设置（DSH 0.2.0-rc.2 内置中文和 English），配置页面、状态提示和插件列表名称/简介同步切换。扩展语言使用宿主的回退链。切换语言保留未保存的设置，无需单独选择插件语言。
+
 ## 配置入口（DSH 0.2.0-rc.2 起）
 
 在首页侧边栏打开 **插件 → 已安装 → dsh-tdai-memory**，直接在插件详情页配置并保存。配置页注册到官方的 `plugins.bundle.config` 接口；全局设置页不再重复显示配置入口。Web 与桌面版使用相同界面，本版要求 DSH 0.2.0-rc.2 或更新的 0.2.x 版本。现有配置无需迁移。
+
+选择 **自动记忆**，一次开启捕获、提取、召回和搜索；**仅搜索已有记忆** 关闭捕获、提取和自动召回，保留搜索工具；**暂停记忆功能** 关闭全部四项。主页面只展示两个模型的连接信息，独立开关、存储路径和调优参数保留在 **高级设置** 中。已有开关组合显示为 **自定义组合**，不会自动覆盖。选择模式后保存，并重启 DSH 使记忆流水线设置生效（搜索工具开关即时生效）。只写入编辑过的字段，密钥留空及未编辑的高级设置保持原值。
 
 **GitHub**: [Scorp1o117/dsh-tdai-memory](https://github.com/Scorp1o117/dsh-tdai-memory) · **npm**: [dsh-tdai-memory](https://www.npmjs.com/package/dsh-tdai-memory) · [English](README.md)
 
@@ -51,6 +55,11 @@ dsh plugin --profile desktop add dsh-tdai-memory@0.3.6
 | 宿主适配 | `StandaloneHostAdapter`（官方 standalone 模式，OpenAI 兼容直调） |
 | dsh 壳 | `index.js`：配置映射、`session/event`+`session/flush` 捕获、`agent.ctx` 上的 `system-prompt/assemble` waterfall 召回注入、工具注册、生命周期 |
 | 备用 | `recall-inject.js`：preset 行形态的召回注入（挂在 agent preset 内时用） |
+
+召回缓存默认 30 秒过期，每个注入实例最多保留 128 个会话。失败或超时的召回
+会在下次组装时重试。preset 行还支持 `timeoutMs`（默认 4000），到达期限后
+不注入记忆并继续组装提示词；提前完成时会清除超时定时器。期限到达后，底层
+召回任务可能仍会继续运行。
 
 关键接线（都是踩坑换来的）：
 

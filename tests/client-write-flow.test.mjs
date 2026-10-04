@@ -5,16 +5,17 @@ import vm from 'node:vm';
 
 const source = await readFile(new URL('../client.js', import.meta.url), 'utf8');
 const settle = () => new Promise(resolve => setImmediate(resolve));
-function mount({ accepted = true, throws = false } = {}) {
+function mount({ accepted = true, throws = false, value = {}, writable = true } = {}) {
   let bundle, page, cursor = 0;
   const states = [], effects = [], dependencies = [], writes = [];
-  let snapshot = { status: 'ready', writable: true, revision: 7, user: {}, value: {
+  const subscribers = new Set();
+  let snapshot = { status: 'ready', writable, revision: 7, user: {}, value: {
     llm: { model: 'old-model', baseUrl: 'https://example.test/v1' },
     embedding: { model: 'old-embedding' }, captureEnabled: true,
-    extraction: { enabled: true }, recall: { enabled: true }
+    extraction: { enabled: true }, recall: { enabled: true }, toolsEnabled: true, ...value
   } };
   const scope = {
-    getSnapshot: () => snapshot, subscribe: () => () => {},
+    getSnapshot: () => snapshot, subscribe(fn) { subscribers.add(fn); return () => subscribers.delete(fn); },
     mutate(ops, revision) {
       writes.push({ ops: JSON.parse(JSON.stringify(ops)), revision });
       if (throws) throw new Error('transport failed');
@@ -51,7 +52,10 @@ function mount({ accepted = true, throws = false } = {}) {
   const element = page({ view: 'page' });
   function render() { cursor = 0; const tree = element.type(element.props); for (const fn of effects.splice(0)) fn(); return tree; }
   render();
-  return { render, writes, snapshot: () => snapshot };
+  return { render, writes, snapshot: () => snapshot, update(value) {
+    snapshot = { ...snapshot, revision: snapshot.revision + 1, value: { ...snapshot.value, ...value } };
+    for (const fn of subscribers) fn();
+  } };
 }
 function find(tree, predicate) {
   if (tree && typeof tree === 'object' && predicate(tree)) return tree;
@@ -105,4 +109,58 @@ test('reset uses the form and clears the draft; synchronous transport errors rel
   button(failed.render(), 'save').props.onClick(); await settle();
   assert.match(text(failed.render()), /transport failed/);
   assert.equal(button(failed.render(), 'save').props.disabled, false);
+});
+
+test('memory modes save the four switches together and preserve connection tuning', async () => {
+  const ui = mount({ value: { llm: { model: 'old-model', timeoutMs: 90000 }, embedding: { model: 'old-embedding', dimensions: 768 } } });
+  const mode = () => find(ui.render(), node => node.type === 'select' && node.props['aria-label'] === 'mode');
+  assert.equal(mode().props.value, 'auto');
+  mode().props.onChange({ target: { value: 'search' } });
+  assert.equal(ui.writes.length, 0, 'selecting a mode does not write immediately');
+  button(ui.render(), 'save').props.onClick(); await settle();
+  assert.deepEqual(ui.writes[0].ops, [
+    { op: 'set', path: ['captureEnabled'], value: false },
+    { op: 'set', path: ['extraction', 'enabled'], value: false },
+    { op: 'set', path: ['recall', 'enabled'], value: false },
+  ]);
+  assert.equal(ui.snapshot().value.toolsEnabled, true);
+  assert.equal(ui.snapshot().value.llm.timeoutMs, 90000);
+  assert.equal(ui.snapshot().value.embedding.dimensions, 768);
+  mode().props.onChange({ target: { value: 'paused' } });
+  button(ui.render(), 'save').props.onClick(); await settle();
+  assert.deepEqual(ui.writes[1].ops, [{ op: 'set', path: ['toolsEnabled'], value: false }]);
+  mode().props.onChange({ target: { value: 'auto' } });
+  button(ui.render(), 'save').props.onClick(); await settle();
+  assert.equal(ui.writes[2].ops.length, 4);
+  assert.ok(ui.writes[2].ops.every(op => op.value === true));
+});
+
+test('custom combinations remain custom and refused mode writes retain the selection', async () => {
+  const ui = mount({ accepted: false, value: { captureEnabled: false } });
+  const mode = () => find(ui.render(), node => node.type === 'select');
+  assert.equal(mode().props.value, 'custom');
+  assert.equal(find(ui.render(), node => node.type === 'details').props.open, undefined, 'advanced starts collapsed');
+  mode().props.onChange({ target: { value: 'paused' } });
+  button(ui.render(), 'save').props.onClick(); await settle();
+  assert.equal(mode().props.value, 'paused');
+  assert.equal(ui.snapshot().value.toolsEnabled, true);
+  assert.match(text(ui.render()), /notApplied/);
+});
+
+test('read-only forms disable every field and the mode control', () => {
+  const ui = mount({ writable: false });
+  assert.equal(field(ui.render(), 'llm.model').props.disabled, true);
+  assert.equal(field(ui.render(), 'captureEnabled').props.disabled, true);
+  assert.equal(find(ui.render(), node => node.type === 'select').props.disabled, true);
+});
+
+test('saving an edited model preserves externally updated hidden options', async () => {
+  const ui = mount();
+  field(ui.render(), 'llm.model').props.onChange({ target: { value: 'new-model' } });
+  ui.update({ embedding: { model: 'external-model', dimensions: 768 }, recall: { enabled: true, timeoutMs: 9000 } });
+  button(ui.render(), 'save').props.onClick(); await settle();
+  assert.equal(ui.writes[0].revision, 8);
+  assert.deepEqual(ui.writes[0].ops, [{ op: 'set', path: ['llm', 'model'], value: 'new-model' }]);
+  assert.equal(ui.snapshot().value.embedding.model, 'external-model');
+  assert.equal(ui.snapshot().value.recall.timeoutMs, 9000);
 });

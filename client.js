@@ -36,6 +36,35 @@ window.__ModuleLoader__.load({
       ".__tm_status{font-size:12px;color:var(--dsw-alias-label-tertiary)}" +
       ".__tm_error{font-size:12px;color:var(--dsw-alias-state-error-primary)}" +
       ".__tm_unavailable{font-size:13px;color:var(--dsw-alias-label-tertiary)}";
+    // Scoped flat controls retain native keyboard and form behavior.
+    CSS += `
+.dsh-flat.__tm_root{width:100%;max-width:720px;gap:14px;font-size:13px;line-height:1.65;color:var(--dsw-alias-label-primary);--flat-accent:var(--dsw-alias-state-business-primary,#3964fe);--flat-border:var(--dsw-alias-border-l2,#dce2eb)}
+.dsh-flat.__tm_root *{box-sizing:border-box;min-width:0}
+.dsh-flat.__tm_root p{margin:0}
+.dsh-flat.__tm_root label[class$="_field"]{gap:7px}
+.dsh-flat.__tm_root [class$="_label"]{font-size:13px;font-weight:500}
+.dsh-flat.__tm_root [class$="_hint"]{font-size:12px;line-height:1.65}
+.dsh-flat.__tm_root input:not([type=checkbox]),.dsh-flat.__tm_root select,.dsh-flat.__tm_root textarea{width:100%;border:1px solid var(--flat-border);border-radius:6px;background:var(--dsw-alias-bg-layer-3);color:inherit;font:inherit;padding:9px 12px;min-height:40px;box-shadow:none;transition:border-color .15s}
+.dsh-flat.__tm_root input:hover:not(:disabled),.dsh-flat.__tm_root select:hover:not(:disabled),.dsh-flat.__tm_root textarea:hover:not(:disabled){border-color:var(--dsw-alias-label-tertiary)}
+.dsh-flat.__tm_root select{appearance:none;padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m2 2 4 4 4-4' fill='none' stroke='%23778091' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.dsh-flat.__tm_root input[type=checkbox]{appearance:none;flex:none;width:30px;height:18px;margin:0;border:1px solid var(--flat-border);border-radius:12px;background:var(--dsw-alias-bg-layer-2);position:relative;cursor:pointer;transition:background .15s,border-color .15s}
+.dsh-flat.__tm_root input[type=checkbox]::before{content:"";position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .15s}
+.dsh-flat.__tm_root input[type=checkbox]:checked{background:var(--flat-accent);border-color:var(--flat-accent)}
+.dsh-flat.__tm_root input[type=checkbox]:checked::before{transform:translateX(12px);background:#fff}
+.dsh-flat.__tm_root :is(input,select,textarea,button,summary,a):focus-visible{outline:2px solid var(--flat-accent);outline-offset:3px}
+.dsh-flat.__tm_root :is(input,select,textarea,button):disabled{opacity:.5;cursor:default}
+.dsh-flat.__tm_root [class$="_actions"]{flex-wrap:wrap;gap:10px;margin-top:4px;padding-top:16px;border-top:1px solid var(--flat-border)}
+.dsh-flat.__tm_root details{border-top:1px solid var(--flat-border);padding:0}
+.dsh-flat.__tm_root summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;font-size:13px;font-weight:500;cursor:pointer;color:var(--dsw-alias-label-secondary)}
+.dsh-flat.__tm_root summary::-webkit-details-marker{display:none}
+.dsh-flat.__tm_root summary::after{content:"+";font-size:18px;font-weight:400;flex:none}
+.dsh-flat.__tm_root details[open]>summary::after{content:"−"}
+.dsh-flat.__tm_root details>div{padding-bottom:18px}
+.dsh-flat.__tm_root .__tm_group{border:0;font-weight:600;font-size:14px;margin:8px 0 0;padding:0}
+@media(prefers-reduced-motion:reduce){.dsh-flat.__tm_root *,.dsh-flat.__tm_root input[type=checkbox]::before{transition:none}}
+.dsh-flat.__tm_root button{border-radius:6px;min-height:34px;padding:7px 14px;font:inherit;font-size:12px;box-shadow:none}
+.dsh-flat.__tm_root :is(h2,h3){margin:0;font-size:14px;font-weight:600}
+`;
     var tagId = "dsh-tdai-memory/main.css";
     if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
       var tag = document.createElement("style");
@@ -50,10 +79,18 @@ window.__ModuleLoader__.load({
     var inject = ["slots", "locale", "configForms"];
     var zh = {
       nav: "记忆",
-      intro: "TDAI 记忆配置：L0 捕获 → L1 结构化提取 → 召回注入。密钥只写不读。TdaiCore 在启动时构建，修改后需重启生效。",
+      mode: "记忆模式",
+      modeAuto: "自动记忆（推荐）",
+      modeSearch: "仅搜索已有记忆",
+      modePaused: "暂停记忆功能",
+      modeCustom: "自定义组合",
+      modeHint: "自动：捕获、提取、召回和搜索全部开启；仅搜索：不记录新对话、不自动注入记忆；暂停：四项全部关闭。选择后点击保存。",
+      advanced: "高级设置：独立开关、存储与请求参数",
+      setupHint: "填写提取模型和向量模型的连接信息，再保存。已有自定义设置会保留；密钥留空不修改。",
+      intro: "记录对话、整理长期记忆，并在相关对话中自动召回。保存后请重启 DSH 生效；密钥只写不读。",
       groupData: "数据",
-      groupLlm: "提取 LLM（L1/L2/L3）",
-      groupEmbedding: "向量 Embedding",
+      groupLlm: "记忆整理模型",
+      groupEmbedding: "向量检索模型",
       groupCapture: "捕获",
       groupExtraction: "提取",
       groupRecall: "召回",
@@ -95,10 +132,18 @@ window.__ModuleLoader__.load({
     };
     var en = {
       nav: "Memory",
-      intro: "TDAI memory config: L0 capture → L1 extraction → recall injection. Keys are write-only. TdaiCore is built at startup; changes apply after a restart.",
+      mode: "Memory mode",
+      modeAuto: "Automatic memory (recommended)",
+      modeSearch: "Search existing memory only",
+      modePaused: "Pause memory features",
+      modeCustom: "Custom combination",
+      modeHint: "Automatic enables capture, extraction, recall and search. Search only records no new conversations and injects no memory. Pause disables all four. Click Save to apply your selection.",
+      advanced: "Advanced: individual switches, storage and request options",
+      setupHint: "Enter the extraction and embedding connections, then save. Existing custom settings are preserved; blank keys stay unchanged.",
+      intro: "Record conversations, organize long-term memory and recall it in relevant chats. Restart DSH after saving to apply changes; keys are write-only.",
       groupData: "Data",
-      groupLlm: "Extraction LLM (L1/L2/L3)",
-      groupEmbedding: "Embeddings",
+      groupLlm: "Memory extraction model",
+      groupEmbedding: "Memory search embeddings",
       groupCapture: "Capture",
       groupExtraction: "Extraction",
       groupRecall: "Recall",
@@ -165,6 +210,9 @@ window.__ModuleLoader__.load({
       { path: ["toolsEnabled"], label: "fieldToolsEnabled", type: "checkbox", group: "groupTools" }
     ];
     FIELDS.forEach(function (f) { f.key = f.path.join("."); });
+    var BASIC_KEYS = ["llm.baseUrl", "llm.apiKey", "llm.model", "embedding.baseUrl", "embedding.apiKey", "embedding.model"];
+    var MODE_KEYS = ["captureEnabled", "extraction.enabled", "recall.enabled", "toolsEnabled"];
+    var MODES = { auto: [true, true, true, true], search: [false, false, false, true], paused: [false, false, false, false] };
 
     function getPath(obj, path) {
       var cur = obj;
@@ -176,6 +224,7 @@ window.__ModuleLoader__.load({
     }
 
     function MemorySection(props) {
+      useLocale(props.locale);
       var t = props.t;
       var scope = props.scope;
       var [snapshot, setSnapshot] = react.useState(function () { return scope.getSnapshot(); });
@@ -204,7 +253,7 @@ window.__ModuleLoader__.load({
       // call, so depending on snapshot.value would reset user input on every
       // render (typing appears dead).
       react.useEffect(function () {
-        if (ready) setDraft(Object.assign({}, valueToDraft(snapshot.value)));
+        if (ready) setDraft({});
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [ready]);
 
@@ -226,6 +275,23 @@ window.__ModuleLoader__.load({
         setNotice(null);
         setError(null);
       }
+      function memoryMode() {
+        var flags = MODE_KEYS.map(function (key) {
+          return Object.prototype.hasOwnProperty.call(draft, key) ? draft[key] : getPath(value, key.split(".")) !== false;
+        });
+        return Object.keys(MODES).find(function (mode) {
+          return MODES[mode].every(function (flag, i) { return flag === flags[i]; });
+        }) || "custom";
+      }
+      function setMode(mode) {
+        if (!MODES[mode] || busy || !snapshot.writable) return;
+        setDraft(function (prev) {
+          var next = Object.assign({}, prev);
+          MODE_KEYS.forEach(function (key, i) { next[key] = MODES[mode][i]; });
+          return next;
+        });
+        setNotice(null); setError(null);
+      }
 
       function onSave() {
         if (busy || !snapshot.writable) return;
@@ -233,6 +299,7 @@ window.__ModuleLoader__.load({
         var ops = [];
         for (var i = 0; i < FIELDS.length; i += 1) {
           var f = FIELDS[i];
+          if (!Object.prototype.hasOwnProperty.call(draft, f.key)) continue;
           var d = fieldDraft(f);
           var current = getPath(value, f.path);
           if (f.type === "password") {
@@ -250,7 +317,7 @@ window.__ModuleLoader__.load({
           if (String(d).trim() === "" && getPath(user, f.path) === void 0) continue;
           ops.push(String(d).trim() === "" ? { op: "unset", path: f.path } : { op: "set", path: f.path, value: f.type === "number" ? Number(d) : d });
         }
-        if (ops.length === 0) { setBusy(false); setNotice(t("saved")); return; }
+        if (ops.length === 0) { setBusy(false); setNotice({ key: "saved" }); return; }
         commit(ops);
       }
 
@@ -269,36 +336,38 @@ window.__ModuleLoader__.load({
           var next = scope.getSnapshot();
           setSnapshot(next);
           setBusy(false);
-          if (!ok) { setError(t("error") + ": " + t("notApplied")); return; }
-          setNotice(t("saved"));
-          if (next.value) setDraft(valueToDraft(next.value));
+          if (!ok) { setError({ key: "error", detailKey: "notApplied" }); return; }
+          setNotice({ key: "saved" });
+          if (next.value) setDraft({});
         }).catch(function (e) {
-          setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
+          setBusy(false); setError({ key: "error", detail: String(e && e.message || e) });
         });
       }
 
-      var nodes = [];
-      var lastGroup = null;
+      var nodes = [], advancedNodes = [];
+      var lastGroups = { basic: null, advanced: null };
       // forEach callback gives each handler its own `f` — a `for (var i)`
       // loop would share one `f` across every onChange closure, so typing
       // updated the LAST field's draft and the input appeared dead.
       FIELDS.forEach(function (f) {
-        if (f.group !== lastGroup) {
-          lastGroup = f.group;
-          nodes.push(h("div", { key: "g" + f.group, className: "__tm_group" }, t(f.group)));
+        var section = BASIC_KEYS.indexOf(f.key) !== -1 ? "basic" : "advanced";
+        var target = section === "basic" ? nodes : advancedNodes;
+        if (f.group !== lastGroups[section]) {
+          lastGroups[section] = f.group;
+          target.push(h("div", { key: "g" + f.group, className: "__tm_group" }, t(f.group)));
         }
         var overridden = getPath(user, f.path) !== void 0;
         if (f.type === "checkbox") {
-          nodes.push(h("label", { key: f.path.join("."), className: "__tm_field" },
+          target.push(h("label", { key: f.path.join("."), className: "__tm_field" },
             h("span", { className: "__tm_row" },
-              h("input", { className: "__tm_check", type: "checkbox", checked: Boolean(fieldDraft(f)), onChange: function (e) { setField(f, e.target.checked); } }),
+              h("input", { className: "__tm_check", type: "checkbox", disabled: busy || !snapshot.writable, checked: Boolean(fieldDraft(f)), onChange: function (e) { setField(f, e.target.checked); } }),
               h("span", { className: "__tm_label" }, t(f.label)),
               overridden ? h("span", { className: "__tm_override" }, t("overridden")) : null
             )
           ));
           return;
         }
-        nodes.push(h("label", { key: f.path.join("."), className: "__tm_field" },
+        target.push(h("label", { key: f.path.join("."), className: "__tm_field" },
           h("span", { className: "__tm_label" },
             t(f.label),
             overridden ? h("span", { className: "__tm_override" }, t("overridden")) : null
@@ -307,6 +376,7 @@ window.__ModuleLoader__.load({
             className: "__tm_input",
             type: f.type === "password" ? "password" : f.type === "number" ? "number" : "text",
             value: fieldDraft(f),
+            disabled: busy || !snapshot.writable,
             placeholder: f.type === "password" ? (overridden ? "••••••••" : t("secretHint")) : "",
             onChange: function (e) { setField(f, e.target.value); }
           }),
@@ -314,29 +384,45 @@ window.__ModuleLoader__.load({
         ));
       });
 
-      return h("div", { className: "__tm_root" },
+      return h("div", { className: "__tm_root dsh-flat" },
         h("p", { className: "__tm_hint", style: { margin: "0 0 4px" } }, t("intro")),
+        h("label", { className: "__tm_field" },
+          h("span", { className: "__tm_label" }, t("mode")),
+          h("select", { className: "__tm_input", "aria-label": t("mode"), value: memoryMode(), disabled: busy || !snapshot.writable,
+            onChange: function (e) { setMode(e.target.value); } },
+            h("option", { value: "auto" }, t("modeAuto")), h("option", { value: "search" }, t("modeSearch")),
+            h("option", { value: "paused" }, t("modePaused")), h("option", { value: "custom", disabled: true }, t("modeCustom"))),
+          h("span", { className: "__tm_hint" }, t("modeHint"))),
+        h("p", { className: "__tm_hint" }, t("setupHint")),
         nodes,
+        h("details", null, h("summary", { style: { cursor: "pointer" } }, t("advanced")),
+          h("div", { style: { display: "flex", flexDirection: "column", gap: 10, paddingTop: 12 } }, advancedNodes)),
         h("div", { className: "__tm_actions" },
           h("button", { type: "button", className: "__tm_btn __tm_btnPrimary", onClick: onSave, disabled: busy || !snapshot.writable }, t("save")),
           h("button", { type: "button", className: "__tm_btn", onClick: onReset, disabled: busy || !snapshot.writable }, t("reset")),
-          notice ? h("span", { className: "__tm_status" }, notice) : null,
+          notice ? h("span", { className: "__tm_status" }, messageText(t, notice)) : null,
           busy ? h("span", { className: "__tm_status" }, t("saving")) : null,
-          error ? h("span", { className: "__tm_error" }, error) : null
+          error ? h("span", { className: "__tm_error" }, messageText(t, error)) : null
         )
       );
     }
 
-    function valueToDraft(value) {
-      var out = {};
-      for (var i = 0; i < FIELDS.length; i += 1) {
-        var f = FIELDS[i];
-        out[f.key] = f.secret ? "" : f.type === "checkbox" ? Boolean(getPath(value, f.path)) : String(getPath(value, f.path) ?? "");
-      }
-      return out;
+    // ── plugin ────────────────────────────────────────────────────────────
+
+    // Follow the host language without remounting the form or losing drafts.
+    function useLocale(locale) {
+      var refresh = react.useState(0)[1];
+      react.useEffect(function () {
+        if (!locale || typeof locale.subscribe !== "function") return;
+        return locale.subscribe(function () { refresh(function (revision) { return revision + 1; }); });
+      }, [locale]);
+    }
+    // Keep translation keys in state so feedback follows later language changes.
+    function messageText(t, message) {
+      if (!message) return "";
+      return t(message.key) + (message.detailKey ? ": " + t(message.detailKey) : message.detail ? ": " + message.detail : "");
     }
 
-    // ── plugin ────────────────────────────────────────────────────────────
     function apply(ctx) {
       var t = ctx.locale.bind(NS);
       ctx.effect(function () { return ctx.locale.register(NS, { zh: zh, en: en }); }, "dsh-tdai-memory: dictionaries");
@@ -347,7 +433,7 @@ window.__ModuleLoader__.load({
           key: "dsh-tdai-memory",
           locale: NS
         }, function (props) {
-          return h(MemorySection, Object.assign({}, props, { scope: scope, t: t }));
+          return h(MemorySection, Object.assign({}, props, { scope: scope, t: t, locale: ctx.locale }));
         });
       });
     }
