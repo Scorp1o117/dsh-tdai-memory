@@ -17,7 +17,7 @@ Data defaults to `~/.memory-tencentdb/memory-tdai`, allowing existing data in th
 
 ## Compatibility and installation
 
-Supports DSH Web / Desktop. The repository declares compatibility with `0.2.0-rc.2`, `0.2.1-rc.1` / `rc.2` / `rc.3` and versions matching `>=0.2.0-rc.2 <0.3.0`; see [package.json](package.json) for the complete prerelease range. Node.js `>=22.18` is required.
+Supports DSH Web / Desktop. The repository declares compatibility with `0.2.0-rc.2`, `0.2.1-rc.1` / `rc.2` / `rc.3` / `rc.4` / `rc.5` and versions matching `>=0.2.0-rc.2 <0.3.0`; see [package.json](package.json) for the complete prerelease range. Node.js `>=22.18` is required.
 
 For Desktop, install its `dsh` command through **Application → Manage dsh Command** first:
 
